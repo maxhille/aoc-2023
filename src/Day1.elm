@@ -1,4 +1,4 @@
-module Day1 exposing (Msg(..), calculate, main, update, view)
+module Day1 exposing (Msg(..), calculate, first, last, main, update, values, view)
 
 import Browser
 import Html exposing (Html, div, h2, li, p, section, text, textarea, ul)
@@ -6,38 +6,72 @@ import Html.Attributes exposing (cols, rows, style)
 import Html.Events exposing (onInput)
 
 
+type alias Value =
+    { int : Int
+    , str : String
+    }
+
+
+values : List Value
+values =
+    [ ( 1, [ "1", "one" ] )
+    , ( 2, [ "2", "two" ] )
+    , ( 3, [ "3", "three" ] )
+    , ( 4, [ "4", "four" ] )
+    , ( 5, [ "5", "five" ] )
+    , ( 6, [ "6", "six" ] )
+    , ( 7, [ "7", "seven" ] )
+    , ( 8, [ "8", "eight" ] )
+    , ( 9, [ "9", "nine" ] )
+    ]
+        |> List.map (\( int, strs ) -> List.map (\str -> { int = int, str = str }) strs)
+        |> List.concat
+
+
+parse : List Value -> String -> Maybe Int
+parse values_ input =
+    values_
+        |> List.map (\value -> { index = String.indexes value.str input |> List.head, int = value.int })
+        |> List.filterMap (\{ index, int } -> Maybe.map (\justIndex -> { index = justIndex, int = int }) index)
+        |> List.sortBy .index
+        |> List.map .int
+        |> List.head
+
+
+first : String -> Maybe Int
+first =
+    parse values
+
+
+last : String -> Maybe Int
+last =
+    let
+        reversed =
+            values |> List.map (\{ int, str } -> { int = int, str = String.reverse str })
+    in
+    String.reverse >> parse reversed
+
+
+toLines : String -> List String
+toLines =
+    String.trim >> String.lines >> List.map String.trim
+
+
 calculate : String -> Result Error Int
 calculate input =
     let
-        lines : List String
-        lines =
-            input
-                |> String.trim
-                |> String.lines
-                |> List.map String.trim
-
-        digits : String -> List String
-        digits line =
-            String.filter Char.isDigit line
-                |> String.toList
-                |> List.map String.fromChar
-
-        combine : String -> Line
-        combine line =
-            case digits line |> (\ns -> ( List.head ns, List.head <| List.reverse ns )) of
-                ( Just first, Just last ) ->
-                    case String.toInt <| first ++ last of
-                        Just value ->
-                            GoodLine value
-
-                        Nothing ->
-                            BadLine line
+        add : String -> Line
+        add line =
+            case ( first line, last line ) of
+                ( Just x, Just y ) ->
+                    GoodLine <| x * 10 + y
 
                 ( _, _ ) ->
                     BadLine line
     in
-    lines
-        |> List.map combine
+    input
+        |> toLines
+        |> List.map add
         |> List.foldl
             (\line acc ->
                 case line of
