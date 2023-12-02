@@ -1,28 +1,32 @@
-module Calculator exposing (Error(..), Model, Msg, calculator)
+module Calculator exposing (Model, Msg, calculator)
 
 import Browser
-import Html exposing (Html, div, h2, li, p, section, text, textarea, ul)
+import Html exposing (Html, div, h2, p, section, text, textarea)
 import Html.Attributes exposing (cols, rows, style)
 import Html.Events exposing (onInput)
 
 
-type Error
-    = NoInput
-    | BadLines (List String)
-
-
 type alias Model =
-    { output : Result Error Int
+    { output : Output
     }
+
+
+type alias Error =
+    String
 
 
 type Msg
     = OnInput String
 
 
+type Output
+    = NoInput
+    | HasResult (Result Error Int)
+
+
 init : Model
 init =
-    { output = Err NoInput
+    { output = NoInput
     }
 
 
@@ -30,7 +34,7 @@ update : (String -> Result Error Int) -> Msg -> Model -> Model
 update calculate msg model =
     case msg of
         OnInput input ->
-            { model | output = calculate input }
+            { model | output = HasResult <| calculate input }
 
 
 view : Model -> Html Msg
@@ -44,21 +48,21 @@ view model =
             [ h2 [] [ text "Output" ]
             , p []
                 [ case model.output of
-                    Ok output ->
-                        output |> String.fromInt |> text
+                    HasResult result ->
+                        case result of
+                            Ok int ->
+                                text <| String.fromInt int
 
-                    Err error ->
-                        case error of
-                            NoInput ->
-                                text "No input yet"
+                            Err error ->
+                                text <| "Error: " ++ error
 
-                            BadLines lines ->
-                                ul [] <| List.map (\line -> li [] [ text <| "Bad line: " ++ line ]) lines
+                    NoInput ->
+                        text "No input yet"
                 ]
             ]
         ]
 
 
-calculator : (String -> Result Error Int) -> Program () Model Msg
-calculator calculate =
-    Browser.sandbox { init = init, update = update calculate, view = view }
+calculator : (String -> Result error Int) -> (error -> String) -> Program () Model Msg
+calculator calculate formatError =
+    Browser.sandbox { init = init, update = update (calculate >> Result.mapError formatError), view = view }

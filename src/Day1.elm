@@ -1,12 +1,16 @@
 module Day1 exposing (calculate, first, last, main, values)
 
-import Calculator exposing (Error(..), calculator)
+import Calculator exposing (calculator)
 
 
 type alias Value =
     { int : Int
     , str : String
     }
+
+
+type alias Error =
+    List String
 
 
 values : List Value
@@ -86,7 +90,7 @@ calculate input =
                     Ok value
 
                 else
-                    Err <| BadLines errors
+                    Err errors
            )
 
 
@@ -97,4 +101,4 @@ type Line
 
 main : Program () Calculator.Model Calculator.Msg
 main =
-    calculator calculate
+    calculator calculate <| String.join ";"
