@@ -1,9 +1,6 @@
-module Day1 exposing (Msg(..), calculate, first, last, main, update, values, view)
+module Day1 exposing (calculate, first, last, main, values)
 
-import Browser
-import Html exposing (Html, div, h2, li, p, section, text, textarea, ul)
-import Html.Attributes exposing (cols, rows, style)
-import Html.Events exposing (onInput)
+import Calculator exposing (Error(..), calculator)
 
 
 type alias Value =
@@ -98,59 +95,6 @@ type Line
     | GoodLine Int
 
 
-type Error
-    = NoInput
-    | BadLines (List String)
-
-
-type alias Model =
-    { output : Result Error Int
-    }
-
-
-type Msg
-    = OnInput String
-
-
-init : Model
-init =
-    { output = Err NoInput
-    }
-
-
-update : Msg -> Model -> Model
-update msg model =
-    case msg of
-        OnInput input ->
-            { model | output = calculate input }
-
-
-view : Model -> Html Msg
-view model =
-    div [ style "padding" "5em" ]
-        [ section []
-            [ h2 [] [ text "Input" ]
-            , textarea [ onInput OnInput, cols 40, rows 10 ] []
-            ]
-        , section []
-            [ h2 [] [ text "Output" ]
-            , p []
-                [ case model.output of
-                    Ok output ->
-                        output |> String.fromInt |> text
-
-                    Err error ->
-                        case error of
-                            NoInput ->
-                                text "No input yet"
-
-                            BadLines lines ->
-                                ul [] <| List.map (\line -> li [] [ text <| "Bad line: " ++ line ]) lines
-                ]
-            ]
-        ]
-
-
-main : Program () Model Msg
+main : Program () Calculator.Model Calculator.Msg
 main =
-    Browser.sandbox { init = init, update = update, view = view }
+    calculator calculate
