@@ -1,7 +1,8 @@
-module Day2 exposing (Color(..), calculate, gameParser, main, parser)
+module Day2 exposing (Color(..), gameParser, main, parser, possibleSum, powerSum)
 
-import Calculator exposing (calculator)
+import Html exposing (text)
 import Parser exposing ((|.), (|=), Parser, Trailing(..), int, oneOf, sequence, spaces, succeed, symbol)
+import Ui exposing (Ui, ui)
 
 
 type alias Game =
@@ -15,8 +16,8 @@ condition =
     { red = 12, green = 13, blue = 14 }
 
 
-calculate : String -> Result (List Parser.DeadEnd) Int
-calculate input =
+possibleSum : String -> Result (List Parser.DeadEnd) Int
+possibleSum input =
     Parser.run parser input
         |> Result.map
             (List.filter isPossible
@@ -32,6 +33,21 @@ isPossible game =
             reveal.red <= condition.red && reveal.green <= condition.green && reveal.blue <= condition.blue
         )
         game.reveals
+
+
+powerSum : String -> Result (List Parser.DeadEnd) Int
+powerSum input =
+    Parser.run parser input
+        |> Result.map (List.map power >> List.sum)
+
+
+power : Game -> Int
+power game =
+    let
+        maximum color =
+            game.reveals |> List.map color |> List.maximum |> Maybe.withDefault 0
+    in
+    List.product [ maximum .red, maximum .green, maximum .blue ]
 
 
 type Color
@@ -134,6 +150,31 @@ gameParser =
         |= revealsParser
 
 
-main : Program () Calculator.Model Calculator.Msg
+main : Ui
 main =
-    calculator calculate Parser.deadEndsToString
+    ui
+        [ { title = "Part 1"
+          , view =
+                possibleSum
+                    >> (\result ->
+                            case result of
+                                Ok int ->
+                                    text <| String.fromInt int
+
+                                Err error ->
+                                    text <| Parser.deadEndsToString error
+                       )
+          }
+        , { title = "Part 2"
+          , view =
+                powerSum
+                    >> (\result ->
+                            case result of
+                                Ok int ->
+                                    text <| String.fromInt int
+
+                                Err error ->
+                                    text <| Parser.deadEndsToString error
+                       )
+          }
+        ]

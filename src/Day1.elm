@@ -1,6 +1,7 @@
 module Day1 exposing (calculate, first, last, main, values)
 
-import Calculator exposing (calculator)
+import Html exposing (li, text, ul)
+import Ui exposing (Ui, ui)
 
 
 type alias Value =
@@ -99,6 +100,19 @@ type Line
     | GoodLine Int
 
 
-main : Program () Calculator.Model Calculator.Msg
+main : Ui
 main =
-    calculator calculate <| String.join ";"
+    ui
+        [ { title = "Day 1 & 2"
+          , view =
+                calculate
+                    >> (\result ->
+                            case result of
+                                Ok int ->
+                                    text <| String.fromInt int
+
+                                Err errors ->
+                                    ul [] <| List.map (\error -> li [] [ text error ]) errors
+                       )
+          }
+        ]
