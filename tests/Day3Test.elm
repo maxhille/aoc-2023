@@ -1,6 +1,6 @@
 module Day3Test exposing (..)
 
-import Day3 exposing (calculate)
+import Day3 exposing (calculatePart1, calculatePart2)
 import Expect
 import Test exposing (..)
 
@@ -27,5 +27,25 @@ suite =
                 in
                 Expect.equal
                     (Ok 4361)
-                    (calculate input)
+                    (calculatePart1 input)
+        , test "Test Part 2 example" <|
+            \_ ->
+                let
+                    input =
+                        """
+                            467..114..
+                            ...*......
+                            ..35..633.
+                            ......#...
+                            617*......
+                            .....+.58.
+                            ..592.....
+                            ......755.
+                            ...$.*....
+                            .664.598..
+                        """
+                in
+                Expect.equal
+                    (Ok 467835)
+                    (calculatePart2 input)
         ]

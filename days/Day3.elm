@@ -1,4 +1,4 @@
-module Day3 exposing (calculate, main)
+module Day3 exposing (calculatePart1, calculatePart2, main)
 
 import Html exposing (text)
 import Parser
@@ -32,6 +32,7 @@ type alias Position =
 
 type alias Symbol =
     { position : Position
+    , value : Char
     }
 
 
@@ -46,11 +47,18 @@ type SymbolPart
     | ParsedPart Part
 
 
-calculate : String -> Result (List Parser.DeadEnd) Int
-calculate string =
+calculatePart1 : String -> Result (List Parser.DeadEnd) Int
+calculatePart1 string =
     substitute ',' string
         |> runParser
         |> Result.map sumParts
+
+
+calculatePart2 : String -> Result (List Parser.DeadEnd) Int
+calculatePart2 string =
+    substitute ',' string
+        |> runParser
+        |> Result.map gearRatios
 
 
 sumParts : Schematic -> Int
@@ -65,6 +73,26 @@ sumParts schematic =
         )
         0
         schematic.parts
+
+
+gearRatios : Schematic -> Int
+gearRatios schematic =
+    let
+        gears =
+            schematic.symbols
+                |> List.filter (\symbol -> symbol.value == '*')
+    in
+    List.foldr
+        (\gear sum ->
+            case List.filter (\part -> adjacent part gear) schematic.parts of
+                part1 :: part2 :: _ ->
+                    part1.id * part2.id + sum
+
+                _ ->
+                    sum
+        )
+        0
+        gears
 
 
 adjacent : Part -> Symbol -> Bool
@@ -137,12 +165,19 @@ symbolParser : Parser Symbol
 symbolParser =
     succeed Symbol
         |= getPosition
-        |. schematicSymbol
+        |= schematicSymbol
 
 
-schematicSymbol : Parser ()
+schematicSymbol : Parser Char
 schematicSymbol =
-    [ "*", "#", "+", "$", "-", "/", "=", "%", "@", "&" ] |> List.map symbol |> oneOf
+    let
+        values =
+            [ '*', '#', '+', '$', '-', '/', '=', '%', '@', '&' ]
+    in
+    oneOf <|
+        List.map
+            (\value -> Parser.map (\_ -> value) (symbol <| String.fromChar value))
+            values
 
 
 main : Ui
@@ -150,7 +185,19 @@ main =
     ui
         [ { title = "Part 1"
           , view =
-                calculate
+                calculatePart1
+                    >> (\result ->
+                            case result of
+                                Ok int ->
+                                    text <| String.fromInt int
+
+                                Err error ->
+                                    text <| Parser.deadEndsToString error
+                       )
+          }
+        , { title = "Part 2"
+          , view =
+                calculatePart2
                     >> (\result ->
                             case result of
                                 Ok int ->
