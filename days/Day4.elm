@@ -1,4 +1,4 @@
-module Day4 exposing (calculatePart1, main, parser)
+module Day4 exposing (calculatePart1, calculatePart2, main, parser)
 
 import Html exposing (text)
 import Parser exposing ((|.), (|=), Parser, Trailing(..), int, sequence, spaces, succeed, symbol)
@@ -19,10 +19,52 @@ calculatePart1 input =
         |> Result.map List.sum
 
 
-score : Card -> Int
-score card =
+calculatePart2 : String -> Result (List Parser.DeadEnd) Int
+calculatePart2 input =
+    Parser.run parser input
+        |> Result.map
+            (\cards ->
+                List.foldl
+                    (\card acc ->
+                        let
+                            remaining =
+                                List.drop 1 acc.remaining
+                        in
+                        { acc
+                            | remaining = remaining
+                            , resulting = copies card remaining ++ acc.resulting
+                        }
+                    )
+                    { remaining = cards
+                    , resulting = []
+                    }
+                    cards
+                    |> .resulting
+                    |> List.length
+            )
+
+
+copies : Card -> List Card -> List Card
+copies card remainder =
+    card
+        :: (matches card
+                |> List.range 1
+                |> List.map (\int -> ( List.drop (int - 1) remainder |> List.head, List.drop int remainder ))
+                |> List.filterMap (\( maybeHead, copyRemainder ) -> Maybe.map (\justHead -> ( justHead, copyRemainder )) maybeHead)
+                |> List.map (\( head, remainer ) -> copies head remainer)
+                |> List.concat
+           )
+
+
+matches : Card -> Int
+matches card =
     Set.intersect (card.winning |> Set.fromList) (card.yours |> Set.fromList)
         |> Set.size
+
+
+score : Card -> Int
+score card =
+    matches card
         |> (\size ->
                 if size == 0 then
                     0
@@ -74,6 +116,18 @@ main =
         [ { title = "Part 1"
           , view =
                 calculatePart1
+                    >> (\result ->
+                            case result of
+                                Ok int ->
+                                    text <| String.fromInt int
+
+                                Err error ->
+                                    text <| Parser.deadEndsToString error
+                       )
+          }
+        , { title = "Part 2"
+          , view =
+                calculatePart2
                     >> (\result ->
                             case result of
                                 Ok int ->
