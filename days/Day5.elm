@@ -1,7 +1,7 @@
-module Day5 exposing (calculatePart1, main, parser, seedsParser)
+module Day5 exposing (calculatePart1, calculatePart2, intersect, main, mapRanges, parser)
 
-import Dict exposing (Dict)
 import Html exposing (text)
+import List.Extra
 import Parser
     exposing
         ( (|.)
@@ -19,33 +19,57 @@ import Parser
 import Ui exposing (Ui, ui)
 
 
-type alias Range =
+type alias RangeMap =
     { destinationRangeStart : Int
     , sourceRangeStart : Int
+    , rangeLength : Int
+    }
+
+
+type alias Range =
+    { start : Int
     , length : Int
     }
 
 
-type alias Map =
-    { destinationType : String
-    , ranges : List Range
-    }
-
-
 type alias Almanac =
-    { seeds : List Int
-    , maps : Dict String Map
+    { seeds : List Range
+    , maps : List (List RangeMap)
     }
 
 
 calculatePart1 : String -> Result (List Parser.DeadEnd) Int
 calculatePart1 input =
+    calculatePart input
+        (\almanac ->
+            { almanac
+                | seeds =
+                    almanac.seeds
+                        |> List.map
+                            (\{ start, length } ->
+                                [ { start = start, length = 1 }
+                                , { start = length, length = 1 }
+                                ]
+                            )
+                        >> List.concat
+            }
+        )
+
+
+calculatePart2 : String -> Result (List Parser.DeadEnd) Int
+calculatePart2 input =
+    calculatePart input identity
+
+
+calculatePart : String -> (Almanac -> Almanac) -> Result (List Parser.DeadEnd) Int
+calculatePart input transform =
     Parser.run
         (parser
+            |> Parser.map transform
             |> Parser.andThen
                 (\almanac ->
                     seedLocations almanac
-                        |> List.filterMap identity
+                        |> List.map .start
                         |> List.minimum
                         |> (\maybe ->
                                 case maybe of
@@ -60,51 +84,112 @@ calculatePart1 input =
         input
 
 
-seedLocations : Almanac -> List (Maybe Int)
+seedLocations : Almanac -> List Range
 seedLocations almanac =
-    almanac.seeds
-        |> List.map (\seed -> Just ( seed, "seed" ))
-        |> List.map (track almanac.maps)
+    List.foldl mapRanges almanac.seeds almanac.maps
 
 
-track : Dict String Map -> Maybe ( Int, String ) -> Maybe Int
-track maps =
-    Maybe.andThen
-        (\( sourceNumber, sourceType ) ->
-            if sourceType == "location" then
-                Just sourceNumber
+mapRanges : List RangeMap -> List Range -> List Range
+mapRanges maps ranges =
+    List.map
+        (\range ->
+            case maps of
+                map :: mapsRemainder ->
+                    let
+                        ( mappedRanges, rangeRemainder ) =
+                            intersect map range
+                    in
+                    mappedRanges ++ mapRanges mapsRemainder rangeRemainder
+
+                [] ->
+                    [ range ]
+        )
+        ranges
+        |> List.concat
+        |> List.Extra.unique
+
+
+intersect : RangeMap -> Range -> ( List Range, List Range )
+intersect map range =
+    let
+        mapStart =
+            map.sourceRangeStart
+
+        mapEnd =
+            map.sourceRangeStart + map.rangeLength - 1
+
+        rangeStart =
+            range.start
+
+        rangeEnd =
+            range.start + range.length - 1
+
+        shift =
+            map.destinationRangeStart - map.sourceRangeStart
+
+        prefix =
+            let
+                end =
+                    min (mapStart - 1) rangeEnd
+
+                length =
+                    end - range.start + 1
+            in
+            if length > 0 then
+                [ { range
+                    | start = range.start
+                    , length = length
+                  }
+                ]
 
             else
-                maps
-                    |> Dict.get sourceType
-                    |> Maybe.map (\map -> ( mapSourceNumber sourceNumber map.ranges, map.destinationType ))
-                    |> track maps
-        )
+                []
 
+        mapped =
+            let
+                start =
+                    max rangeStart mapStart
 
-mapSourceNumber : Int -> List Range -> Int
-mapSourceNumber number ranges =
-    List.foldr
-        (\range hit ->
-            case hit of
-                Just int ->
-                    Just int
+                end =
+                    min rangeEnd mapEnd
 
-                Nothing ->
-                    if number >= range.sourceRangeStart && number < range.sourceRangeStart + range.length then
-                        Just <| number + range.destinationRangeStart - range.sourceRangeStart
+                length =
+                    end - start + 1
+            in
+            if length > 0 then
+                [ { range
+                    | start = start + shift
+                    , length = length
+                  }
+                ]
 
-                    else
-                        Nothing
-        )
-        Nothing
-        ranges
-        |> Maybe.withDefault number
+            else
+                []
+
+        postfix =
+            let
+                start =
+                    max (mapEnd + 1) rangeStart
+
+                length =
+                    rangeEnd - start + 1
+            in
+            if length > 0 then
+                [ { range
+                    | start = start
+                    , length = length
+                  }
+                ]
+
+            else
+                []
+    in
+    ( mapped, List.concat [ prefix, postfix ] )
 
 
 parser : Parser Almanac
 parser =
-    succeed (\seeds maps -> { seeds = seeds, maps = Dict.fromList maps })
+    succeed Almanac
         |= seedsParser
         |= sequence
             { start = ""
@@ -116,7 +201,7 @@ parser =
             }
 
 
-seedsParser : Parser (List Int)
+seedsParser : Parser (List Range)
 seedsParser =
     succeed identity
         |. spaces
@@ -126,32 +211,36 @@ seedsParser =
             , separator = ""
             , end = ""
             , spaces = spaces
-            , item = int
+            , item =
+                Parser.succeed Range
+                    |= int
+                    |. spaces
+                    |= int
             , trailing = Optional
             }
 
 
-mapParser : Parser ( String, Map )
+mapParser : Parser (List RangeMap)
 mapParser =
-    succeed (\src dst ranges -> ( src, { destinationType = dst, ranges = ranges } ))
+    succeed identity
         |. spaces
-        |= (Parser.getChompedString <| succeed () |. chompWhile (\c -> c /= '-'))
+        |. chompWhile (\c -> c /= '-')
         |. token "-to-"
-        |= (Parser.getChompedString <| succeed () |. chompWhile (\c -> c /= ' '))
+        |. chompWhile (\c -> c /= ' ')
         |. token " map:"
         |= sequence
             { start = ""
             , separator = ""
             , end = ""
             , spaces = spaces
-            , item = rangeParser
+            , item = rangeMapParser
             , trailing = Optional
             }
 
 
-rangeParser : Parser Range
-rangeParser =
-    succeed Range
+rangeMapParser : Parser RangeMap
+rangeMapParser =
+    succeed RangeMap
         |= int
         |. spaces
         |= int
@@ -165,6 +254,18 @@ main =
         [ { title = "Part 1"
           , view =
                 calculatePart1
+                    >> (\result ->
+                            case result of
+                                Ok int ->
+                                    text <| String.fromInt int
+
+                                Err error ->
+                                    text <| Parser.deadEndsToString error
+                       )
+          }
+        , { title = "Part 2"
+          , view =
+                calculatePart2
                     >> (\result ->
                             case result of
                                 Ok int ->
