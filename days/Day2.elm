@@ -1,8 +1,7 @@
-module Day2 exposing (Color(..), gameParser, main, parser, possibleSum, powerSum)
+module Day2 exposing (Color(..), gameParser, parser, possibleSum, powerSum, puzzle)
 
-import Html exposing (text)
 import Parser exposing ((|.), (|=), Parser, Trailing(..), int, oneOf, sequence, spaces, succeed, symbol)
-import Ui exposing (Ui, ui)
+import Puzzle exposing (Puzzle)
 
 
 type alias Game =
@@ -150,31 +149,9 @@ gameParser =
         |= revealsParser
 
 
-main : Ui
-main =
-    ui
-        [ { title = "Part 1"
-          , view =
-                possibleSum
-                    >> (\result ->
-                            case result of
-                                Ok int ->
-                                    text <| String.fromInt int
-
-                                Err error ->
-                                    text <| Parser.deadEndsToString error
-                       )
-          }
-        , { title = "Part 2"
-          , view =
-                powerSum
-                    >> (\result ->
-                            case result of
-                                Ok int ->
-                                    text <| String.fromInt int
-
-                                Err error ->
-                                    text <| Parser.deadEndsToString error
-                       )
-          }
-        ]
+puzzle : Puzzle
+puzzle =
+    { validate = Parser.run parser >> Result.map (\_ -> "Got Game") >> Result.mapError Parser.deadEndsToString
+    , calculatePart1 = possibleSum >> Result.mapError Parser.deadEndsToString
+    , calculatePart2 = powerSum >> Result.mapError Parser.deadEndsToString
+    }

@@ -1,9 +1,8 @@
-module Day4 exposing (calculatePart1, calculatePart2, main, parser)
+module Day4 exposing (calculatePart1, calculatePart2, parser, puzzle)
 
-import Html exposing (text)
 import Parser exposing ((|.), (|=), Parser, Trailing(..), int, sequence, spaces, succeed, symbol)
+import Puzzle exposing (Puzzle)
 import Set
-import Ui exposing (Ui, ui)
 
 
 type alias Card =
@@ -110,31 +109,9 @@ numbersParser =
         }
 
 
-main : Ui
-main =
-    ui
-        [ { title = "Part 1"
-          , view =
-                calculatePart1
-                    >> (\result ->
-                            case result of
-                                Ok int ->
-                                    text <| String.fromInt int
-
-                                Err error ->
-                                    text <| Parser.deadEndsToString error
-                       )
-          }
-        , { title = "Part 2"
-          , view =
-                calculatePart2
-                    >> (\result ->
-                            case result of
-                                Ok int ->
-                                    text <| String.fromInt int
-
-                                Err error ->
-                                    text <| Parser.deadEndsToString error
-                       )
-          }
-        ]
+puzzle : Puzzle
+puzzle =
+    { validate = Parser.run parser >> Result.map (\_ -> "Got Cards") >> Result.mapError Parser.deadEndsToString
+    , calculatePart1 = calculatePart1 >> Result.mapError Parser.deadEndsToString
+    , calculatePart2 = calculatePart2 >> Result.mapError Parser.deadEndsToString
+    }

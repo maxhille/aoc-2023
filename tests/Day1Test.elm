@@ -1,6 +1,6 @@
 module Day1Test exposing (..)
 
-import Day1 exposing (calculate, first, last)
+import Day1 exposing (calculatePart1, calculatePart2, first, last, valuesPart2)
 import Expect
 import Test exposing (..)
 
@@ -19,7 +19,7 @@ suite =
                         treb7uchet
                         """
                 in
-                Expect.equal (Ok 142) (calculate input)
+                Expect.equal (Ok 142) (calculatePart1 input)
         , test "Example calculation result - Part 2" <|
             \_ ->
                 let
@@ -34,7 +34,7 @@ suite =
                         7pqrstsixteen
                         """
                 in
-                Expect.equal (Ok 281) (calculate input)
+                Expect.equal (Ok 281) (calculatePart2 input)
         , test "Edge case 1" <|
             \_ ->
                 let
@@ -43,7 +43,7 @@ suite =
                         eightwothree
                         """
                 in
-                Expect.equal (Just 8) (first input)
+                Expect.equal (Just 8) (first valuesPart2 input)
         , test "Edge case 2" <|
             \_ ->
                 let
@@ -52,5 +52,5 @@ suite =
                         oonethreee
                         """
                 in
-                Expect.equal (Just 3) (last input)
+                Expect.equal (Just 3) (last valuesPart2 input)
         ]

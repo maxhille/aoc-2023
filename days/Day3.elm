@@ -1,4 +1,4 @@
-module Day3 exposing (calculatePart1, calculatePart2, main)
+module Day3 exposing (calculatePart1, calculatePart2, puzzle)
 
 import Html exposing (text)
 import Parser
@@ -14,7 +14,7 @@ import Parser
         , succeed
         , symbol
         )
-import Ui exposing (Ui, ui)
+import Puzzle exposing (Puzzle)
 
 
 type alias Part =
@@ -180,31 +180,14 @@ schematicSymbol =
             values
 
 
-main : Ui
-main =
-    ui
-        [ { title = "Part 1"
-          , view =
-                calculatePart1
-                    >> (\result ->
-                            case result of
-                                Ok int ->
-                                    text <| String.fromInt int
-
-                                Err error ->
-                                    text <| Parser.deadEndsToString error
-                       )
-          }
-        , { title = "Part 2"
-          , view =
-                calculatePart2
-                    >> (\result ->
-                            case result of
-                                Ok int ->
-                                    text <| String.fromInt int
-
-                                Err error ->
-                                    text <| Parser.deadEndsToString error
-                       )
-          }
-        ]
+puzzle : Puzzle
+puzzle =
+    { validate =
+        \input ->
+            substitute ',' input
+                |> runParser
+                >> Result.mapError Parser.deadEndsToString
+                >> Result.map (\_ -> "got schematic ")
+    , calculatePart1 = calculatePart1 >> Result.mapError Parser.deadEndsToString
+    , calculatePart2 = calculatePart2 >> Result.mapError Parser.deadEndsToString
+    }

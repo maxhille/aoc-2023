@@ -1,7 +1,6 @@
-module Day1 exposing (calculate, first, last, main, values)
+module Day1 exposing (calculatePart1, calculatePart2, first, last, puzzle, valuesPart2)
 
-import Html exposing (li, text, ul)
-import Ui exposing (Ui, ui)
+import Puzzle exposing (Puzzle)
 
 
 type alias Value =
@@ -14,8 +13,33 @@ type alias Error =
     List String
 
 
-values : List Value
-values =
+calculatePart1 : String -> Result Error Int
+calculatePart1 =
+    calculate valuesPart1
+
+
+calculatePart2 : String -> Result Error Int
+calculatePart2 =
+    calculate valuesPart2
+
+
+valuesPart1 : List Value
+valuesPart1 =
+    [ ( 1, "1" )
+    , ( 2, "2" )
+    , ( 3, "3" )
+    , ( 4, "4" )
+    , ( 5, "5" )
+    , ( 6, "6" )
+    , ( 7, "7" )
+    , ( 8, "8" )
+    , ( 9, "9" )
+    ]
+        |> List.map (\( int, str ) -> { int = int, str = str })
+
+
+valuesPart2 : List Value
+valuesPart2 =
     [ ( 1, [ "1", "one" ] )
     , ( 2, [ "2", "two" ] )
     , ( 3, [ "3", "three" ] )
@@ -40,13 +64,13 @@ parse values_ input =
         |> List.head
 
 
-first : String -> Maybe Int
-first =
+first : List Value -> String -> Maybe Int
+first values =
     parse values
 
 
-last : String -> Maybe Int
-last =
+last : List Value -> String -> Maybe Int
+last values =
     let
         reversed =
             values |> List.map (\{ int, str } -> { int = int, str = String.reverse str })
@@ -59,12 +83,12 @@ toLines =
     String.trim >> String.lines >> List.map String.trim
 
 
-calculate : String -> Result Error Int
-calculate input =
+calculate : List Value -> String -> Result Error Int
+calculate values input =
     let
         add : String -> Line
         add line =
-            case ( first line, last line ) of
+            case ( first values line, last values line ) of
                 ( Just x, Just y ) ->
                     GoodLine <| x * 10 + y
 
@@ -100,19 +124,9 @@ type Line
     | GoodLine Int
 
 
-main : Ui
-main =
-    ui
-        [ { title = "Day 1 & 2"
-          , view =
-                calculate
-                    >> (\result ->
-                            case result of
-                                Ok int ->
-                                    text <| String.fromInt int
-
-                                Err errors ->
-                                    ul [] <| List.map (\error -> li [] [ text error ]) errors
-                       )
-          }
-        ]
+puzzle : Puzzle
+puzzle =
+    { validate = \_ -> Ok ""
+    , calculatePart1 = calculatePart1 >> Result.mapError (String.join "; ")
+    , calculatePart2 = calculatePart2 >> Result.mapError (String.join "; ")
+    }

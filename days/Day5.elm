@@ -1,6 +1,5 @@
-module Day5 exposing (calculatePart1, calculatePart2, intersect, main, mapRanges, parser)
+module Day5 exposing (calculatePart1, calculatePart2, intersect, mapRanges, parser, puzzle)
 
-import Html exposing (text)
 import List.Extra
 import Parser
     exposing
@@ -16,7 +15,7 @@ import Parser
         , succeed
         , token
         )
-import Ui exposing (Ui, ui)
+import Puzzle exposing (Puzzle)
 
 
 type alias RangeMap =
@@ -248,31 +247,9 @@ rangeMapParser =
         |= int
 
 
-main : Ui
-main =
-    ui
-        [ { title = "Part 1"
-          , view =
-                calculatePart1
-                    >> (\result ->
-                            case result of
-                                Ok int ->
-                                    text <| String.fromInt int
-
-                                Err error ->
-                                    text <| Parser.deadEndsToString error
-                       )
-          }
-        , { title = "Part 2"
-          , view =
-                calculatePart2
-                    >> (\result ->
-                            case result of
-                                Ok int ->
-                                    text <| String.fromInt int
-
-                                Err error ->
-                                    text <| Parser.deadEndsToString error
-                       )
-          }
-        ]
+puzzle : Puzzle
+puzzle =
+    { validate = Parser.run parser >> Result.map (\_ -> "Got Mappings") >> Result.mapError Parser.deadEndsToString
+    , calculatePart1 = calculatePart1 >> Result.mapError Parser.deadEndsToString
+    , calculatePart2 = calculatePart2 >> Result.mapError Parser.deadEndsToString
+    }

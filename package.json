@@ -1,0 +1,16 @@
+{
+  "name": "aoc-2023",
+  "version": "1.0.0",
+  "description": "https://adventofcode.com/2023",
+  "main": "ui/Ui.elm",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "elm-test",
+    "start": "elm-live ui/Ui.elm --start-page index.html -- --output=index.js --optimize",
+    "dev": "elm-live ui/Ui.elm --start-page index.html -- --output=index.js --debug"
+  },
+  "author": "Max Hille <mh@lambdasoup.com>",
+  "license": "GPL3+"
+}
