@@ -7,6 +7,7 @@ import Day2
 import Day3
 import Day4
 import Day5
+import Day6
 import Html exposing (Html, a, button, h1, h2, h3, li, main_, nav, p, section, text, textarea, ul)
 import Html.Attributes exposing (href, spellcheck, value)
 import Html.Events exposing (onClick, onInput)
@@ -55,6 +56,16 @@ init _ url key =
             , Just Day3.puzzle
             , Just Day4.puzzle
             , Just Day5.puzzle
+            , Just Day6.puzzle
+            , Nothing
+            , Nothing
+            , Nothing
+            , Nothing
+            , Nothing
+            , Nothing
+            , Nothing
+            , Nothing
+            , Nothing
             ]
       , calculatation1 = NotStarted
       , calculatation2 = NotStarted
