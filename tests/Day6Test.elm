@@ -1,6 +1,6 @@
 module Day6Test exposing (..)
 
-import Day6 exposing (calculatePart1, parser, winterval)
+import Day6 exposing (calculatePart1, calculatePart2, parser, winterval)
 import Expect
 import Parser
 import Test exposing (..)
@@ -21,6 +21,18 @@ suite =
                 Expect.equal
                     (Ok 288)
                     (calculatePart1 input)
+        , test "Calculate Part 2" <|
+            \_ ->
+                let
+                    input =
+                        """
+                        Time:      7  15   30
+                        Distance:  9  40  200
+                        """
+                in
+                Expect.equal
+                    (Ok 71503)
+                    (calculatePart2 input)
         , test "Test winterval" <|
             \_ ->
                 let
