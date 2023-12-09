@@ -1,6 +1,15 @@
-module Day7 exposing (Hand(..), Strength(..), calculatePart1, entryParser, puzzle, strength)
+module Day7 exposing
+    ( Hand(..)
+    , Jokers(..)
+    , Strength(..)
+    , calculatePart1
+    , calculatePart2
+    , entryParser
+    , puzzle
+    , strength
+    )
 
-import Dict exposing (Dict)
+import Dict
 import Parser exposing ((|.), (|=), Parser, Trailing(..), chompWhile, getChompedString, int, sequence, spaces)
 import Puzzle exposing (Puzzle)
 
@@ -25,13 +34,28 @@ type Hand
     = Hand Char Char Char Char Char
 
 
+type Jokers
+    = With
+    | Without
+
+
 calculatePart1 : String -> Result (List Parser.DeadEnd) Int
-calculatePart1 input =
+calculatePart1 =
+    calculate Without
+
+
+calculatePart2 : String -> Result (List Parser.DeadEnd) Int
+calculatePart2 =
+    calculate With
+
+
+calculate : Jokers -> String -> Result (List Parser.DeadEnd) Int
+calculate jokers input =
     Parser.run parser input
         |> Result.map
             (\entries ->
                 entries
-                    |> List.sortWith compareEntries
+                    |> List.sortWith (compareEntries jokers)
                     |> List.foldl
                         (\entry { rank, total } ->
                             { rank = rank + 1
@@ -45,21 +69,21 @@ calculatePart1 input =
             )
 
 
-compareEntries : Entry -> Entry -> Order
-compareEntries entry1 entry2 =
-    compareHand entry1.hand entry2.hand
+compareEntries : Jokers -> Entry -> Entry -> Order
+compareEntries jokers entry1 entry2 =
+    compareHand jokers entry1.hand entry2.hand
 
 
-compareHand : Hand -> Hand -> Order
-compareHand ((Hand a1 b1 c1 d1 e1) as hand1) ((Hand a2 b2 c2 d2 e2) as hand2) =
-    case compareStrength (strength hand1) (strength hand2) of
+compareHand : Jokers -> Hand -> Hand -> Order
+compareHand jokers ((Hand a1 b1 c1 d1 e1) as hand1) ((Hand a2 b2 c2 d2 e2) as hand2) =
+    case compareStrength (strength jokers hand1) (strength jokers hand2) of
         EQ ->
             let
                 order1 =
-                    [ a1, b1, c1, d1, e1 ] |> List.map cardOrder
+                    [ a1, b1, c1, d1, e1 ] |> List.map (cardOrder jokers)
 
                 order2 =
-                    [ a2, b2, c2, d2, e2 ] |> List.map cardOrder
+                    [ a2, b2, c2, d2, e2 ] |> List.map (cardOrder jokers)
             in
             compare order1 order2
 
@@ -70,8 +94,8 @@ compareHand ((Hand a1 b1 c1 d1 e1) as hand1) ((Hand a2 b2 c2 d2 e2) as hand2) =
             GT
 
 
-cardOrder : Char -> Int
-cardOrder char =
+cardOrder : Jokers -> Char -> Int
+cardOrder jokers char =
     case char of
         'A' ->
             0
@@ -83,7 +107,12 @@ cardOrder char =
             -2
 
         'J' ->
-            -3
+            case jokers of
+                Without ->
+                    -3
+
+                With ->
+                    -100
 
         'T' ->
             -4
@@ -116,56 +145,6 @@ cardOrder char =
             -13
 
 
-compareCard : Char -> Char -> Order
-compareCard char1 char2 =
-    let
-        order char_ =
-            case char_ of
-                'A' ->
-                    0
-
-                'K' ->
-                    -1
-
-                'D' ->
-                    -2
-
-                'J' ->
-                    -3
-
-                'T' ->
-                    -4
-
-                '9' ->
-                    -5
-
-                '8' ->
-                    -6
-
-                '7' ->
-                    -7
-
-                '6' ->
-                    -8
-
-                '5' ->
-                    -9
-
-                '4' ->
-                    -10
-
-                '3' ->
-                    -11
-
-                '2' ->
-                    -12
-
-                _ ->
-                    -13
-    in
-    compare (order char1) (order char2)
-
-
 compareStrength : Strength -> Strength -> Order
 compareStrength strength1 strength2 =
     let
@@ -195,8 +174,8 @@ compareStrength strength1 strength2 =
     compare (order strength1) (order strength2)
 
 
-strength : Hand -> Strength
-strength (Hand a b c d e) =
+strength : Jokers -> Hand -> Strength
+strength jokers (Hand a b c d e) =
     let
         add char =
             Dict.update char (Maybe.withDefault 0 >> (+) 1 >> Just)
@@ -207,8 +186,27 @@ strength (Hand a b c d e) =
         |> add c
         |> add d
         |> add e
-        |> Dict.values
-        |> (List.sort >> List.reverse)
+        |> (\dict ->
+                case jokers of
+                    Without ->
+                        ( dict, 0 )
+
+                    With ->
+                        let
+                            jokerCount =
+                                Dict.get 'J' dict |> Maybe.withDefault 0
+                        in
+                        ( Dict.update 'J' (\_ -> Just 0) dict, jokerCount )
+           )
+        |> (Tuple.mapFirst <| Dict.values >> List.sort >> List.reverse)
+        |> (\( counts, jokerCount ) ->
+                case counts of
+                    head :: tail ->
+                        (head + jokerCount) :: tail
+
+                    [] ->
+                        []
+           )
         |> (\counts ->
                 case counts of
                     5 :: _ ->
@@ -273,5 +271,5 @@ puzzle : Puzzle
 puzzle =
     { validate = Parser.run parser >> Result.map (\_ -> "Got Sheet") >> Result.mapError Parser.deadEndsToString
     , calculatePart1 = calculatePart1 >> Result.mapError Parser.deadEndsToString
-    , calculatePart2 = (\_ -> Ok 0) >> Result.mapError Parser.deadEndsToString
+    , calculatePart2 = calculatePart2 >> Result.mapError Parser.deadEndsToString
     }
