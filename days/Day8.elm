@@ -1,12 +1,16 @@
 module Day8 exposing
     ( Instruction(..)
     , calculatePart1
+    , calculatePart2
+    , factors
     , instructionForStep
+    , lcm
     , parser
     , puzzle
     )
 
 import Dict exposing (Dict)
+import List.Extra
 import Parser exposing ((|.), (|=), Parser, Trailing(..), chompWhile, getChompedString, sequence, spaces, symbol)
 import Puzzle exposing (Puzzle)
 
@@ -22,6 +26,11 @@ type Instruction
     | Right
 
 
+type Mode
+    = Ghost
+    | Human
+
+
 type alias Node =
     String
 
@@ -33,12 +42,97 @@ type alias Fork =
 calculatePart1 : String -> Result (List Parser.DeadEnd) Int
 calculatePart1 input =
     Parser.run parser input
-        |> Result.map (search 0 "AAA")
+        |> Result.map (search Human 0 "AAA")
 
 
-search : Int -> Node -> Network -> Int
-search step node network =
-    if node == "ZZZ" then
+calculatePart2 : String -> Result (List Parser.DeadEnd) Int
+calculatePart2 input =
+    Parser.run parser input
+        |> Result.map
+            (\network ->
+                findStartNodes network
+                    |> List.map (\node -> search Ghost 0 node network)
+                    |> lcm
+                    -- this step assumes that 1. the instruction cycle lengths are divisors of ghost path lenght and ghost paths always return right to their start point
+                    |> Maybe.withDefault 0
+            )
+
+
+lcm : List Int -> Maybe Int
+lcm =
+    List.map factors
+        >> pad
+        >> List.Extra.transpose
+        >> List.map List.maximum
+        >> List.map (Maybe.withDefault 0)
+        >> List.foldl
+            (\exp acc ->
+                { acc
+                    | index = acc.index + 1
+                    , product = acc.product * acc.index ^ exp
+                }
+            )
+            { product = 1, index = 1 }
+        >> .product
+        >> Just
+
+
+pad : List (List Int) -> List (List Int)
+pad xss =
+    let
+        length =
+            List.map List.length xss
+                |> List.maximum
+                |> Maybe.withDefault 0
+    in
+    List.map (\xs -> xs ++ List.repeat (length - List.length xs) 0) xss
+
+
+factors : Int -> List Int
+factors n =
+    1 :: factorsHelper [] (List.range 2 n) n
+
+
+factorsHelper : List Int -> List Int -> Int -> List Int
+factorsHelper fs ps n =
+    if n == 1 then
+        fs
+
+    else
+        case ps of
+            pn :: pr ->
+                let
+                    count =
+                        divsBy pn n
+                in
+                factorsHelper (List.append fs [ count ]) pr (n // (pn ^ count))
+
+            [] ->
+                1 :: fs
+
+
+divsBy : Int -> Int -> Int
+divsBy by n =
+    if modBy by n == 0 then
+        1 + divsBy by (n // by)
+
+    else
+        0
+
+
+findStartNodes : Network -> List Node
+findStartNodes =
+    .forks
+        >> Dict.keys
+        >> List.filter (String.endsWith "A")
+
+
+search : Mode -> Int -> Node -> Network -> Int
+search mode step node network =
+    if mode == Human && node == "ZZZ" then
+        step
+
+    else if mode == Ghost && String.endsWith "Z" node then
         step
 
     else
@@ -46,7 +140,7 @@ search step node network =
             instruction =
                 instructionForStep step network.instructions
         in
-        search (step + 1) (nextNode node instruction network) network
+        search mode (step + 1) (nextNode node instruction network) network
 
 
 nextNode : Node -> Instruction -> Network -> Node
@@ -139,5 +233,5 @@ puzzle : Puzzle
 puzzle =
     { validate = Parser.run parser >> Result.map (\_ -> "could not parse") >> Result.mapError Parser.deadEndsToString
     , calculatePart1 = calculatePart1 >> Result.mapError Parser.deadEndsToString
-    , calculatePart2 = calculatePart1 >> Result.mapError Parser.deadEndsToString
+    , calculatePart2 = calculatePart2 >> Result.mapError Parser.deadEndsToString
     }

@@ -22,8 +22,8 @@ type alias Model =
     , key : Key
     , day : Int
     , puzzles : List (Maybe Puzzle)
-    , calculatation1 : Calculation
-    , calculatation2 : Calculation
+    , calculation1 : Calculation
+    , calculation2 : Calculation
     }
 
 
@@ -36,7 +36,7 @@ type Msg
 
 type Calculation
     = NotStarted
-    | Problem
+    | Problem String
     | Finished Int
 
 
@@ -71,8 +71,8 @@ init _ url key =
             , Nothing
             , Nothing
             ]
-      , calculatation1 = NotStarted
-      , calculatation2 = NotStarted
+      , calculation1 = NotStarted
+      , calculation2 = NotStarted
       }
     , Cmd.none
     )
@@ -84,8 +84,8 @@ update msg model =
         OnInput input ->
             ( { model
                 | input = input
-                , calculatation1 = NotStarted
-                , calculatation2 = NotStarted
+                , calculation1 = NotStarted
+                , calculation2 = NotStarted
               }
             , Cmd.none
             )
@@ -113,26 +113,26 @@ update msg model =
         CalculatePart part puzzle ->
             if part == 1 then
                 ( { model
-                    | calculatation1 =
+                    | calculation1 =
                         case puzzle.calculatePart1 model.input of
                             Ok int ->
                                 Finished int
 
-                            Err _ ->
-                                Problem
+                            Err error ->
+                                Problem error
                   }
                 , Cmd.none
                 )
 
             else
                 ( { model
-                    | calculatation2 =
+                    | calculation2 =
                         case puzzle.calculatePart2 model.input of
                             Ok int ->
                                 Finished int
 
-                            Err _ ->
-                                Problem
+                            Err error ->
+                                Problem error
                   }
                 , Cmd.none
                 )
@@ -190,8 +190,8 @@ view model =
                                     ]
                                 , section []
                                     [ h3 [] [ text "Output" ]
-                                    , viewCalculation model.calculatation1 puzzle model.input 1 CalculatePart
-                                    , viewCalculation model.calculatation2 puzzle model.input 2 CalculatePart
+                                    , viewCalculation model.calculation1 puzzle model.input 1 CalculatePart
+                                    , viewCalculation model.calculation2 puzzle model.input 2 CalculatePart
                                     ]
                                 ]
 
@@ -216,8 +216,8 @@ viewCalculation calculation puzzle input part msg =
                     Err _ ->
                         text "Input invalid"
 
-            Problem ->
-                text "There was a problem with the calculation"
+            Problem str ->
+                text <| "There was a problem with the calculation: " ++ str
 
             Finished int ->
                 text <| "Result Part " ++ String.fromInt part ++ ": " ++ String.fromInt int
