@@ -10,6 +10,7 @@ import Day5
 import Day6
 import Day7
 import Day8
+import Day9
 import Html exposing (Html, a, button, h1, h2, h3, li, main_, nav, p, section, text, textarea, ul)
 import Html.Attributes exposing (href, spellcheck, value)
 import Html.Events exposing (onClick, onInput)
@@ -61,6 +62,7 @@ init _ url key =
             , Just Day6.puzzle
             , Just Day7.puzzle
             , Just Day8.puzzle
+            , Just Day9.puzzle
             , Nothing
             , Nothing
             , Nothing
@@ -213,8 +215,8 @@ viewCalculation calculation puzzle input part msg =
                     Ok _ ->
                         button [ onClick <| msg part puzzle ] [ text <| "Calculate Part " ++ String.fromInt part ]
 
-                    Err _ ->
-                        text "Input invalid"
+                    Err error ->
+                        text <| "Input invalid: " ++ error
 
             Problem str ->
                 text <| "There was a problem with the calculation: " ++ str
