@@ -1,4 +1,4 @@
-module Day9 exposing (calculatePart1, derive, difference, historyParser, parser, puzzle)
+module Day9 exposing (Mode(..), calculatePart1, calculatePart2, derive, difference, historyParser, parser, puzzle)
 
 import Parser exposing ((|.), (|=), Parser, Step(..), Trailing(..), andThen, int, loop, map, oneOf, problem, succeed, symbol)
 import Puzzle exposing (Puzzle)
@@ -8,23 +8,44 @@ type alias History =
     List Int
 
 
+type Mode
+    = Past
+    | Future
+
+
 calculatePart1 : String -> Result (List Parser.DeadEnd) Int
 calculatePart1 =
     Parser.run parser
-        >> Result.map (List.map (derive 0) >> List.sum)
+        >> Result.map (List.map (derive Future []) >> List.map List.sum >> List.sum)
 
 
-derive : Int -> History -> Int
-derive y xs =
+calculatePart2 : String -> Result (List Parser.DeadEnd) Int
+calculatePart2 =
+    Parser.run parser
+        >> Result.map (List.map (derive Past []) >> List.map alternatingDifference >> List.sum)
+
+
+alternatingDifference : List Int -> Int
+alternatingDifference =
+    List.foldl (\y result -> y - result) 0
+
+
+derive : Mode -> List Int -> History -> List Int
+derive mode ys xs =
     if List.all ((==) 0) xs then
-        y
+        ys
 
     else
         let
-            last =
-                List.reverse xs |> List.head |> Maybe.withDefault 0
+            y =
+                case mode of
+                    Future ->
+                        List.reverse xs |> List.head |> Maybe.withDefault 0
+
+                    Past ->
+                        xs |> List.head |> Maybe.withDefault 0
         in
-        derive (last + y) (difference xs)
+        derive mode (y :: ys) (difference xs)
 
 
 difference : List Int -> List Int
@@ -95,5 +116,5 @@ puzzle : Puzzle
 puzzle =
     { validate = Parser.run parser >> Result.map (\_ -> "could not parse") >> Result.mapError Parser.deadEndsToString
     , calculatePart1 = calculatePart1 >> Result.mapError Parser.deadEndsToString
-    , calculatePart2 = (\_ -> Ok 1) >> Result.mapError Parser.deadEndsToString
+    , calculatePart2 = calculatePart2 >> Result.mapError Parser.deadEndsToString
     }
