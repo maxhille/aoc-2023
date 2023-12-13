@@ -1,4 +1,15 @@
-module Day10 exposing (Direction(..), Map, Tile(..), calculatePart1, getAt, getStart, parser, puzzle)
+module Day10 exposing
+    ( Direction(..)
+    , Map
+    , Tile(..)
+    , calculatePart1
+    , calculatePart2
+    , getAt
+    , parser
+    , pipeAtPos
+    , puzzle
+    , startPosition
+    )
 
 import Parser exposing ((|.), (|=), Parser, Step(..), Trailing(..), andThen, loop, map, oneOf, problem, succeed, symbol)
 import Puzzle exposing (Puzzle)
@@ -31,47 +42,189 @@ type alias Error =
 
 type alias Ghost =
     { pos : Position
-    , entryDir : Direction
+    , dir : Direction
     }
 
 
 calculatePart1 : String -> Result Error Int
-calculatePart1 input =
-    Parser.run parser input
-        |> Result.mapError Parser.deadEndsToString
-        |> Result.andThen pathLength
+calculatePart1 =
+    Parser.run parser
+        >> Result.mapError Parser.deadEndsToString
+        >> Result.andThen path
+        >> Result.map (\path_ -> List.length path_ // 2)
 
 
-pathLength : Map -> Result Error Int
-pathLength map =
-    getStart map
-        |> Result.andThen (\start -> spawn start map)
-        |> Result.andThen (\( ghost1, ghost2 ) -> pathLengthHelp 1 ghost1 ghost2 map)
+calculatePart2 : String -> Result Error Int
+calculatePart2 =
+    Parser.run parser
+        >> Result.mapError Parser.deadEndsToString
+        >> Result.andThen
+            (\map ->
+                path map
+                    |> Result.andThen (\path_ -> countEnclosedTiles path_ map)
+            )
 
 
-pathLengthHelp : Int -> Ghost -> Ghost -> Map -> Result Error Int
-pathLengthHelp steps ghost1 ghost2 map =
-    if ghost1.pos == ghost2.pos then
-        Ok steps
+countEnclosedTiles : List Position -> Map -> Result Error Int
+countEnclosedTiles path_ map =
+    startPosition map
+        |> Result.andThen (\start -> Result.map (\pipe -> ( start, pipe )) <| pipeAtPos start map)
+        |> Result.map (\( start, ( dir1, dir2 ) ) -> replace start (Pipe ( dir1, dir2 )) map)
+        |> Result.map (List.indexedMap (countEnclosedRowTiles path_) >> List.sum)
+
+
+countEnclosedRowTiles : List Position -> Int -> List Tile -> Int
+countEnclosedRowTiles path_ y tiles =
+    List.foldl
+        (\( x, tile ) acc ->
+            let
+                cleanedTile =
+                    if List.member ( x, y ) path_ then
+                        tile
+
+                    else
+                        Ground
+
+                state =
+                    update acc.state cleanedTile
+            in
+            { acc
+                | state = state
+                , count =
+                    if state.inside && cleanedTile == Ground then
+                        acc.count + 1
+
+                    else
+                        acc.count
+            }
+        )
+        { state = { inside = False, grinding = NotGrinding }, count = 0 }
+        (List.indexedMap Tuple.pair tiles)
+        |> .count
+
+
+update : State -> Tile -> State
+update state tile =
+    case tile of
+        Pipe ( N, E ) ->
+            { state | grinding = FromNorth }
+
+        Pipe ( N, S ) ->
+            { state | inside = not state.inside }
+
+        Pipe ( N, W ) ->
+            case state.grinding of
+                FromNorth ->
+                    { state
+                        | grinding = NotGrinding
+                    }
+
+                FromSouth ->
+                    { state
+                        | inside = not state.inside
+                        , grinding = NotGrinding
+                    }
+
+                NotGrinding ->
+                    -- should never happen
+                    state
+
+        Pipe ( E, S ) ->
+            { state | grinding = FromSouth }
+
+        Pipe ( E, W ) ->
+            state
+
+        Pipe ( S, W ) ->
+            case state.grinding of
+                FromNorth ->
+                    { state
+                        | inside = not state.inside
+                        , grinding = NotGrinding
+                    }
+
+                FromSouth ->
+                    { state
+                        | grinding = NotGrinding
+                    }
+
+                NotGrinding ->
+                    -- should never happen
+                    state
+
+        _ ->
+            state
+
+
+type alias State =
+    { inside : Bool
+    , grinding : Grinding
+    }
+
+
+type Grinding
+    = NotGrinding
+    | FromSouth
+    | FromNorth
+
+
+path : Map -> Result Error (List Position)
+path map =
+    startPosition map
+        |> Result.andThen
+            (\start ->
+                pipeAtPos start map
+                    |> Result.andThen
+                        (\( dir1, dir2 ) ->
+                            pathHelp start [] { pos = start, dir = dir1 } (replace start (Pipe ( dir1, dir2 )) map)
+                        )
+            )
+
+
+pathHelp : Position -> List Position -> Ghost -> Map -> Result Error (List Position)
+pathHelp start positions ghost map =
+    if positions /= [] && ghost.pos == start then
+        Ok <| positions
 
     else
         let
-            ghostResult1 =
-                advance ghost1 map
-
-            ghostResult2 =
-                advance ghost2 map
+            ghostResult =
+                advance ghost map
         in
-        case ( ghostResult1, ghostResult2 ) of
-            ( Ok ghostNext1, Ok ghostNext2 ) ->
-                pathLengthHelp (steps + 1) ghostNext1 ghostNext2 map
+        case ghostResult of
+            Ok ghostNext ->
+                pathHelp start (ghostNext.pos :: positions) ghostNext map
 
-            ( _, _ ) ->
-                Err "Ghosts could not advance"
+            Err error ->
+                Err error
 
 
-spawn : Position -> Map -> Result Error ( Ghost, Ghost )
-spawn pos map =
+replace : Position -> Tile -> Map -> Map
+replace ( x, y ) tile map =
+    List.concat
+        [ List.take y map
+        , [ case List.drop y map of
+                row :: _ ->
+                    List.concat
+                        [ List.take x row
+                        , case List.drop x row of
+                            _ :: _ ->
+                                [ tile ]
+
+                            _ ->
+                                []
+                        , List.drop (x + 1) row
+                        ]
+
+                _ ->
+                    []
+          ]
+        , List.drop (y + 1) map
+        ]
+
+
+pipeAtPos : Position -> Map -> Result Error ( Direction, Direction )
+pipeAtPos pos map =
     [ N, E, S, W ]
         |> List.filterMap
             (\dir ->
@@ -82,13 +235,13 @@ spawn pos map =
                     neighbourTile =
                         getAt neighbourPos map
 
-                    neighbourEntryDir =
-                        invertDirection dir
+                    pointsBack ( dir1, dir2 ) =
+                        opposite dir1 == dir || opposite dir2 == dir
                 in
                 case neighbourTile of
-                    Pipe ( dirP1, dirP2 ) ->
-                        if neighbourEntryDir == dirP1 || neighbourEntryDir == dirP2 then
-                            Just { pos = neighbourPos, entryDir = invertDirection dir }
+                    Pipe pipeDirs ->
+                        if pointsBack pipeDirs then
+                            Just dir
 
                         else
                             Nothing
@@ -96,46 +249,42 @@ spawn pos map =
                     _ ->
                         Nothing
             )
-        |> (\ghosts ->
-                case ghosts of
-                    [ ghost1, ghost2 ] ->
-                        Ok ( ghost1, ghost2 )
+        |> (\exits ->
+                case exits of
+                    [ exit1, exit2 ] ->
+                        Ok ( exit1, exit2 )
 
                     _ ->
-                        Err "wrong number of ghosts"
+                        Err "position is no path pipe: has wrong number of exits"
            )
 
 
 advance : Ghost -> Map -> Result Error Ghost
 advance ghost map =
     let
-        pipe =
-            getAt ghost.pos map
+        nextPos =
+            move ghost.pos ghost.dir
+
+        nextTile =
+            getAt nextPos map
     in
-    case pipe of
+    case nextTile of
         Pipe ( p1, p2 ) ->
-            let
-                exitDirection =
-                    if ghost.entryDir == p1 then
-                        p2
+            if p1 == opposite ghost.dir then
+                Ok { pos = nextPos, dir = p2 }
 
-                    else
-                        p1
+            else if p2 == opposite ghost.dir then
+                Ok { pos = nextPos, dir = p1 }
 
-                nextPosition =
-                    move ghost.pos exitDirection
-
-                nextEntryDirection =
-                    invertDirection exitDirection
-            in
-            Ok { pos = nextPosition, entryDir = nextEntryDirection }
+            else
+                Err "ghost ran into a pipe wall"
 
         _ ->
-            Err "clipped through pipe wall"
+            Err "ghost tried to exit the pipe"
 
 
-invertDirection : Direction -> Direction
-invertDirection direction =
+opposite : Direction -> Direction
+opposite direction =
     case direction of
         N ->
             S
@@ -150,9 +299,9 @@ invertDirection direction =
             E
 
 
-getStart : Map -> Result Error Position
-getStart =
-    Result.fromMaybe "could not find start"
+startPosition : Map -> Result Error Position
+startPosition =
+    Result.fromMaybe "could not find start tile"
         << List.foldl
             (\( cury, row ) xy ->
                 case xy of
@@ -289,5 +438,5 @@ puzzle : Puzzle
 puzzle =
     { validate = Parser.run parser >> Result.map (\_ -> "could not parse") >> Result.mapError Parser.deadEndsToString
     , calculatePart1 = calculatePart1
-    , calculatePart2 = (\_ -> Ok 1) >> Result.mapError Parser.deadEndsToString
+    , calculatePart2 = calculatePart2
     }
