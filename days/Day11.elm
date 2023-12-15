@@ -21,7 +21,15 @@ calculatePart1 : String -> Result Error Int
 calculatePart1 input =
     Parser.run parser input
         |> Result.mapError Parser.deadEndsToString
-        |> Result.map expand
+        |> Result.map (expand 2)
+        |> Result.map sumDistances
+
+
+calculatePart2 : String -> Result Error Int
+calculatePart2 input =
+    Parser.run parser input
+        |> Result.mapError Parser.deadEndsToString
+        |> Result.map (expand 1000000)
         |> Result.map sumDistances
 
 
@@ -55,14 +63,14 @@ pairsHelp pairs_ positions =
             pairs_
 
 
-expand : Image -> Image
-expand =
-    expandHelp 0 Tuple.first Tuple.mapFirst
-        >> expandHelp 0 Tuple.second Tuple.mapSecond
+expand : Int -> Image -> Image
+expand factor =
+    expandHelp factor 0 Tuple.first Tuple.mapFirst
+        >> expandHelp factor 0 Tuple.second Tuple.mapSecond
 
 
-expandHelp : Int -> (Position -> Int) -> ((Int -> Int) -> Position -> Position) -> Image -> Image
-expandHelp i extract mod image =
+expandHelp : Int -> Int -> (Position -> Int) -> ((Int -> Int) -> Position -> Position) -> Image -> Image
+expandHelp factor i extract mod image =
     if Set.filter (\pos -> extract pos >= i) image == Set.empty then
         image
 
@@ -70,12 +78,12 @@ expandHelp i extract mod image =
         let
             ( i_, expandedImage ) =
                 if Set.filter (\pos -> extract pos == i) image == Set.empty then
-                    ( i + 2
+                    ( i + factor
                     , image
                         |> Set.map
                             (\pos ->
                                 if extract pos > i then
-                                    mod ((+) 1) pos
+                                    mod ((+) (factor - 1)) pos
 
                                 else
                                     pos
@@ -85,7 +93,7 @@ expandHelp i extract mod image =
                 else
                     ( i + 1, image )
         in
-        expandHelp i_ extract mod expandedImage
+        expandHelp factor i_ extract mod expandedImage
 
 
 parser : Parser Image
@@ -138,5 +146,5 @@ puzzle : Puzzle
 puzzle =
     { validate = Parser.run parser >> Result.map (\_ -> "could not parse") >> Result.mapError Parser.deadEndsToString
     , calculatePart1 = calculatePart1
-    , calculatePart2 = \_ -> Err "not implemented"
+    , calculatePart2 = calculatePart2
     }

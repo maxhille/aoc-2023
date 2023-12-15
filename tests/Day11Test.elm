@@ -62,5 +62,5 @@ suite =
                 in
                 Expect.equal
                     (Set.fromList [ ( 3, 2 ), ( 2, 5 ), ( 3, 6 ) ])
-                    (expand image)
+                    (expand 2 image)
         ]
