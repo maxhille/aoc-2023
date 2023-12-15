@@ -5,6 +5,7 @@ import Browser.Navigation exposing (Key, load, pushUrl)
 import Day1
 import Day10
 import Day11
+import Day12
 import Day2
 import Day3
 import Day4
@@ -67,6 +68,7 @@ init _ url key =
             , Just Day9.puzzle
             , Just Day10.puzzle
             , Just Day11.puzzle
+            , Just Day12.puzzle
             , Nothing
             , Nothing
             , Nothing
