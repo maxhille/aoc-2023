@@ -1,5 +1,6 @@
-module Day14 exposing (Field(..), calculatePart1, parser, puzzle)
+module Day14 exposing (Field(..), calculatePart1, calculatePart2, parser, puzzle)
 
+import Dict exposing (Dict)
 import List.Extra
 import Parser exposing ((|.), (|=), Parser, Step(..), Trailing(..), oneOf, symbol)
 import Puzzle exposing (Puzzle)
@@ -22,15 +23,81 @@ type alias Error =
 calculatePart1 : Dish -> Result Error Int
 calculatePart1 =
     List.Extra.transpose
-        >> List.map tiltRow
-        >> List.map weight
-        >> List.sum
+        >> tilt
+        >> weight
         >> Ok
 
 
 calculatePart2 : Dish -> Result Error Int
-calculatePart2 _ =
-    Err "not implemented"
+calculatePart2 =
+    List.Extra.transpose
+        >> spinCycle 1000000000
+        >> weight
+        >> Ok
+
+
+spinCycle : Int -> Dish -> Dish
+spinCycle =
+    spinCycleHelp Dict.empty
+
+
+spinCycleHelp : Dict Key Int -> Int -> Dish -> Dish
+spinCycleHelp dict spins dish =
+    if spins == 0 then
+        dish
+
+    else
+        let
+            cycle =
+                tilt >> rotate >> tilt >> rotate >> tilt >> rotate >> tilt >> rotate
+        in
+        case Dict.get (key dish) dict of
+            Just loopEnd ->
+                let
+                    loopLength =
+                        loopEnd - spins
+                in
+                if spins > loopLength then
+                    spinCycleHelp dict (modBy loopLength spins) dish
+
+                else
+                    spinCycleHelp dict (spins - 1) (cycle dish)
+
+            Nothing ->
+                spinCycleHelp (Dict.insert (key dish) spins dict) (spins - 1) (cycle dish)
+
+
+type alias Key =
+    List (List Int)
+
+
+key : Dish -> Key
+key =
+    List.map
+        (List.map
+            (\field ->
+                case field of
+                    Rounded ->
+                        0
+
+                    Cube ->
+                        1
+
+                    Empty ->
+                        2
+            )
+        )
+
+
+rotate : Dish -> Dish
+rotate =
+    List.Extra.transpose
+        >> List.reverse
+
+
+tilt : Dish -> Dish
+tilt =
+    List.map tiltRow
 
 
 tiltRow : List Field -> List Field
@@ -60,8 +127,14 @@ tiltRowHelp revFragments fields =
             tiltRowHelp (tiltFragment head :: revFragments) (List.drop 1 remainder)
 
 
-weight : List Field -> Int
-weight fields =
+weight : Dish -> Int
+weight =
+    List.map weightRow
+        >> List.sum
+
+
+weightRow : List Field -> Int
+weightRow fields =
     fields
         |> List.indexedMap
             (\i field ->
