@@ -10,49 +10,65 @@ import Util exposing (sanitize)
 suite : Test
 suite =
     describe "Day 13 tests"
-        [ test "Part 1 - Example 1" <|
+        [ test "Part 1 - Example" <|
             \_ ->
                 let
                     input =
                         sanitize <|
                             """
-                                 #.##..##.
-                                 ..#.##.#.
-                                 ##......#
-                                 ##......#
-                                 ..#.##.#.
-                                 ..##..##.
-                                 #.#.##.#.
-                                 """
+                            #.##..##.
+                            ..#.##.#.
+                            ##......#
+                            ##......#
+                            ..#.##.#.
+                            ..##..##.
+                            #.#.##.#.
+
+                            #...##..#
+                            #....#..#
+                            ..##..###
+                            #####.##.
+                            #####.##.
+                            ..##..###
+                            #....#..#
+                            """
                 in
                 Expect.equal
-                    (Ok 5)
+                    (Ok 405)
                     (Parser.run parser input
                         |> Result.mapError Parser.deadEndsToString
                         |> Result.andThen calculatePart1
                     )
-        , test "Part 1 - Example 2" <|
+        , test "Part 2 - Example" <|
             \_ ->
                 let
                     input =
                         sanitize <|
                             """
-                             #...##..#
-                             #....#..#
-                             ..##..###
-                             #####.##.
-                             #####.##.
-                             ..##..###
-                             #....#..#
-                             """
+                            #.##..##.
+                            ..#.##.#.
+                            ##......#
+                            ##......#
+                            ..#.##.#.
+                            ..##..##.
+                            #.#.##.#.
+
+                            #...##..#
+                            #....#..#
+                            ..##..###
+                            #####.##.
+                            #####.##.
+                            ..##..###
+                            #....#..#
+                            """
                 in
                 Expect.equal
                     (Ok 400)
                     (Parser.run parser input
                         |> Result.mapError Parser.deadEndsToString
-                        |> Result.andThen calculatePart1
+                        |> Result.andThen calculatePart2
                     )
-        , test "perfectReflection" <|
+        , test "horizontalReflection" <|
             \_ ->
                 let
                     input =
@@ -73,7 +89,7 @@ suite =
                         |> Result.mapError Parser.deadEndsToString
                         |> Result.toMaybe
                         |> Maybe.andThen List.head
-                        |> Maybe.andThen horizontalReflection
+                        |> Maybe.andThen (horizontalReflection Original)
                     )
         , test "parser" <|
             \_ ->

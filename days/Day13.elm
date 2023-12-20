@@ -1,4 +1,4 @@
-module Day13 exposing (Field(..), calculatePart1, horizontalReflection, parser, patternParser, puzzle)
+module Day13 exposing (Field(..), Mode(..), calculatePart1, calculatePart2, horizontalReflection, parser, patternParser, puzzle)
 
 import List.Extra
 import Parser exposing ((|.), (|=), Parser, Step(..), Trailing(..), andThen, loop, map, oneOf, spaces, succeed, symbol)
@@ -14,18 +14,28 @@ type Field
     | Rocks
 
 
+type Mode
+    = Original
+    | Smudge
+
+
 type alias Error =
     String
 
 
 calculatePart1 : List Pattern -> Result Error Int
 calculatePart1 =
-    List.map resultForPattern >> joinResults >> Result.map List.sum
+    List.map (resultForPattern Original) >> joinResults >> Result.map List.sum
 
 
-resultForPattern : Pattern -> Result Error Int
-resultForPattern pattern =
-    case ( horizontalReflection pattern, verticalReflection pattern ) of
+calculatePart2 : List Pattern -> Result Error Int
+calculatePart2 =
+    List.map (resultForPattern Smudge) >> joinResults >> Result.map List.sum
+
+
+resultForPattern : Mode -> Pattern -> Result Error Int
+resultForPattern mode pattern =
+    case ( horizontalReflection mode pattern, verticalReflection mode pattern ) of
         ( Just row, Nothing ) ->
             Ok <| row * 100
 
@@ -39,21 +49,21 @@ resultForPattern pattern =
             Err "Two reflections found."
 
 
-verticalReflection : Pattern -> Maybe Int
-verticalReflection =
-    List.Extra.transpose >> horizontalReflection
+verticalReflection : Mode -> Pattern -> Maybe Int
+verticalReflection mode =
+    List.Extra.transpose >> horizontalReflection mode
 
 
-horizontalReflection : Pattern -> Maybe Int
-horizontalReflection pattern =
-    List.map (\i -> ( i, isReflection pattern i )) (List.range 1 (List.length pattern - 1))
+horizontalReflection : Mode -> Pattern -> Maybe Int
+horizontalReflection mode pattern =
+    List.map (\i -> ( i, isReflection mode pattern i )) (List.range 1 (List.length pattern - 1))
         |> List.filter (\( _, valid ) -> valid)
         |> List.map Tuple.first
         |> List.head
 
 
-isReflection : Pattern -> Int -> Bool
-isReflection pattern row =
+isReflection : Mode -> Pattern -> Int -> Bool
+isReflection mode pattern row =
     let
         rows1 =
             pattern |> List.take row |> List.reverse
@@ -68,7 +78,18 @@ isReflection pattern row =
     in
     case maybeMinlength of
         Just minLength ->
-            List.take minLength rows1 == List.take minLength rows2
+            List.Extra.zip (List.take minLength rows1 |> List.concat) (List.take minLength rows2 |> List.concat)
+                |> List.map (\( field1, field2 ) -> field1 == field2)
+                |> List.filter ((==) False)
+                |> List.length
+                |> (\length ->
+                        case mode of
+                            Original ->
+                                length == 0
+
+                            Smudge ->
+                                length == 1
+                   )
 
         Nothing ->
             False
@@ -163,5 +184,5 @@ puzzle : Puzzle
 puzzle =
     { validate = Parser.run parser >> Result.map (\_ -> "could not parse") >> Result.mapError Parser.deadEndsToString
     , calculatePart1 = Parser.run parser >> Result.mapError Parser.deadEndsToString >> Result.andThen calculatePart1
-    , calculatePart2 = \_ -> Err "not implemented"
+    , calculatePart2 = Parser.run parser >> Result.mapError Parser.deadEndsToString >> Result.andThen calculatePart2
     }
