@@ -7,6 +7,7 @@ import Day10
 import Day11
 import Day12
 import Day13
+import Day14
 import Day2
 import Day3
 import Day4
@@ -71,6 +72,7 @@ init _ url key =
             , Just Day11.puzzle
             , Just Day12.puzzle
             , Just Day13.puzzle
+            , Just Day14.puzzle
             , Nothing
             , Nothing
             , Nothing
