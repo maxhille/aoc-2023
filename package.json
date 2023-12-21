@@ -8,8 +8,8 @@
   },
   "scripts": {
     "test": "elm-test",
-    "start": "elm-live ui/Ui.elm --start-page index.html -- --output=index.js --optimize",
-    "dev": "elm-live ui/Ui.elm --start-page index.html -- --output=index.js --debug"
+    "start": "elm-live ui/Worker.elm --no-server -- --output=elm-worker.js --optimize & elm-live ui/Ui.elm --start-page index.html -- --output=index.js --optimize",
+    "dev": "elm-live ui/Worker.elm --no-server -- --output=elm-worker.js & elm-live ui/Ui.elm --start-page index.html -- --output=index.js --debug"
   },
   "author": "Max Hille <mh@lambdasoup.com>",
   "license": "GPL3+"

@@ -1,7 +1,5 @@
 module Puzzle exposing (Puzzle)
 
-import Parser
-
 
 type alias Puzzle =
     { validate : String -> Result String String

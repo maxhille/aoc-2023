@@ -1,33 +1,26 @@
-module Ui exposing (main)
+port module Ui exposing (main)
 
 import Browser exposing (UrlRequest(..))
 import Browser.Navigation exposing (Key, load, pushUrl)
-import Day1
-import Day10
-import Day11
-import Day12
-import Day13
-import Day14
-import Day2
-import Day3
-import Day4
-import Day5
-import Day6
-import Day7
-import Day8
-import Day9
 import Html exposing (Html, a, button, h1, h2, h3, li, main_, nav, p, section, text, textarea, ul)
 import Html.Attributes exposing (href, spellcheck, value)
 import Html.Events exposing (onClick, onInput)
 import Puzzle exposing (Puzzle)
+import Shared exposing (Request, Response, toResult)
 import Url exposing (Url)
+
+
+port fromWorker : (Response -> msg) -> Sub msg
+
+
+port toWorker : Request -> Cmd msg
 
 
 type alias Model =
     { input : String
     , key : Key
     , day : Int
-    , puzzles : List (Maybe Puzzle)
+    , puzzles : List Puzzle
     , calculation1 : Calculation
     , calculation2 : Calculation
     }
@@ -37,12 +30,14 @@ type Msg
     = OnInput String
     | OnUrlChange Url
     | OnUrlRequest UrlRequest
-    | CalculatePart Int Puzzle
+    | CalculatePart Int
+    | OnPartResult Int (Result String Int)
 
 
 type Calculation
     = NotStarted
     | Problem String
+    | Progress
     | Finished Int
 
 
@@ -58,31 +53,7 @@ init _ url key =
     ( { input = ""
       , key = key
       , day = fromUrl url
-      , puzzles =
-            [ Just Day1.puzzle
-            , Just Day2.puzzle
-            , Just Day3.puzzle
-            , Just Day4.puzzle
-            , Just Day5.puzzle
-            , Just Day6.puzzle
-            , Just Day7.puzzle
-            , Just Day8.puzzle
-            , Just Day9.puzzle
-            , Just Day10.puzzle
-            , Just Day11.puzzle
-            , Just Day12.puzzle
-            , Just Day13.puzzle
-            , Just Day14.puzzle
-            , Nothing
-            , Nothing
-            , Nothing
-            , Nothing
-            , Nothing
-            , Nothing
-            , Nothing
-            , Nothing
-            , Nothing
-            ]
+      , puzzles = Shared.puzzles
       , calculation1 = NotStarted
       , calculation2 = NotStarted
       }
@@ -122,11 +93,24 @@ update msg model =
                     , load url
                     )
 
-        CalculatePart part puzzle ->
+        CalculatePart part ->
+            ( case part of
+                1 ->
+                    { model | calculation1 = Progress }
+
+                2 ->
+                    { model | calculation2 = Progress }
+
+                _ ->
+                    model
+            , toWorker { day = model.day, part = part, input = model.input }
+            )
+
+        OnPartResult part result ->
             if part == 1 then
                 ( { model
                     | calculation1 =
-                        case puzzle.calculatePart1 model.input of
+                        case result of
                             Ok int ->
                                 Finished int
 
@@ -139,7 +123,7 @@ update msg model =
             else
                 ( { model
                     | calculation2 =
-                        case puzzle.calculatePart2 model.input of
+                        case result of
                             Ok int ->
                                 Finished int
 
@@ -157,7 +141,6 @@ view model =
             model.puzzles
                 |> List.drop (model.day - 1)
                 |> List.head
-                |> Maybe.withDefault Nothing
 
         name day =
             "Day " ++ String.fromInt day
@@ -170,18 +153,13 @@ view model =
                 [ h2 [] [ text "Puzzles" ]
                 , ul [] <|
                     List.indexedMap
-                        (\i puzzle ->
+                        (\i _ ->
                             li []
                                 [ let
                                     day =
                                         i + 1
                                   in
-                                  case puzzle of
-                                    Just _ ->
-                                        a [ href <| "#" ++ String.fromInt day ] [ text <| name day ]
-
-                                    Nothing ->
-                                        text <| name day
+                                  a [ href <| "#" ++ String.fromInt day ] [ text <| name day ]
                                 ]
                         )
                         model.puzzles
@@ -216,14 +194,14 @@ view model =
     }
 
 
-viewCalculation : Calculation -> Puzzle -> String -> Int -> (Int -> Puzzle -> Msg) -> Html Msg
+viewCalculation : Calculation -> Puzzle -> String -> Int -> (Int -> Msg) -> Html Msg
 viewCalculation calculation puzzle input part msg =
     p []
         [ case calculation of
             NotStarted ->
                 case puzzle.validate input of
                     Ok _ ->
-                        button [ onClick <| msg part puzzle ] [ text <| "Calculate Part " ++ String.fromInt part ]
+                        button [ onClick <| msg part ] [ text <| "Calculate Part " ++ String.fromInt part ]
 
                     Err error ->
                         text <| "Input invalid: " ++ error
@@ -233,6 +211,9 @@ viewCalculation calculation puzzle input part msg =
 
             Finished int ->
                 text <| "Result Part " ++ String.fromInt part ++ ": " ++ String.fromInt int
+
+            Progress ->
+                text <| "Working..."
         ]
 
 
@@ -242,7 +223,7 @@ main =
         { init = init
         , view = view
         , update = update
-        , subscriptions = \_ -> Sub.none
+        , subscriptions = \_ -> fromWorker (toResult >> (\( part, result ) -> OnPartResult part result))
         , onUrlRequest = OnUrlRequest
         , onUrlChange = OnUrlChange
         }

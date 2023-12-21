@@ -20,9 +20,13 @@
 		</style>
 	</head>
 	<body>
-	    <script src="index.js"></script>
+		<script src="index.js"></script>
 		<script>
-		  var app = Elm.Ui.init();      
+			const worker = new Worker("worker.js");
+			const app = Elm.Ui.init();
+
+			app.ports.toWorker.subscribe( (data) => worker.postMessage(data) );
+			worker.onmessage = (e) => app.ports.fromWorker.send(e.data);
 		</script>
 	</body>
 </html>
