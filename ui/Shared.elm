@@ -6,6 +6,7 @@ import Day11
 import Day12
 import Day13
 import Day14
+import Day15
 import Day2
 import Day3
 import Day4
@@ -33,6 +34,7 @@ puzzles =
     , Day12.puzzle
     , Day13.puzzle
     , Day14.puzzle
+    , Day15.puzzle
     ]
 
 
