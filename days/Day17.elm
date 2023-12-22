@@ -2,7 +2,7 @@ module Day17 exposing (calculatePart1, calculatePart2, parser, puzzle)
 
 import Dict exposing (Dict)
 import List.Extra
-import Parser exposing ((|.), (|=), Parser, Step(..), Trailing(..), oneOf, symbol)
+import Parser exposing ((|.), (|=), Parser, Step(..), Trailing(..))
 import Puzzle exposing (Puzzle)
 import Set exposing (Set)
 
@@ -25,6 +25,31 @@ type alias Error =
 calculatePart1 : Grid -> Result Error Int
 calculatePart1 grid =
     let
+        width =
+            grid |> List.head |> Maybe.map List.length |> Maybe.withDefault 0
+
+        height =
+            grid |> List.length
+
+        raGrid =
+            List.indexedMap
+                (\y row ->
+                    List.indexedMap
+                        (\x heat ->
+                            ( ( x, y ), heat )
+                        )
+                        row
+                )
+                grid
+                |> List.concat
+                |> Dict.fromList
+    in
+    astar ( 0, 0 ) ( width - 1, height - 1 ) (crucibleMoves raGrid) |> Result.fromMaybe "Dijkstra unsuccessful"
+
+
+calculatePart2 : Grid -> Result Error Int
+calculatePart2 grid =
+    let
         w =
             grid |> List.head |> Maybe.map List.length |> Maybe.withDefault 0
 
@@ -44,12 +69,7 @@ calculatePart1 grid =
                 |> List.concat
                 |> Dict.fromList
     in
-    dijkstra ( 0, 0 ) ( w - 1, h - 1 ) raGrid |> Result.fromMaybe "Dijkstra unsuccessful"
-
-
-calculatePart2 : Grid -> Result Error Int
-calculatePart2 grid =
-    Err "not implemented"
+    astar ( 0, 0 ) ( w - 1, h - 1 ) (ultraCrucibleMoves raGrid) |> Result.fromMaybe "A* Star unsuccessful"
 
 
 type alias Node =
@@ -67,13 +87,13 @@ type alias RaGrid =
     Dict Position Int
 
 
-dijkstra : Position -> Position -> RaGrid -> Maybe Int
-dijkstra start goal grid =
-    dijkstraHelp goal grid (frontierOfSingleElement ( 0, { position = start, lastDir = Down, lastDirCount = 0 } )) Set.empty
+astar : Position -> Position -> (Node -> List ( Int, Node )) -> Maybe Int
+astar start goal getNeighbours =
+    astarHelp goal getNeighbours (frontierOfSingleElement ( 0, { position = start, lastDir = Down, lastDirCount = 0 } )) Set.empty
 
 
-dijkstraHelp : Position -> RaGrid -> Frontier -> Set NodeKey -> Maybe Int
-dijkstraHelp goal grid frontier expanded =
+astarHelp : Position -> (Node -> List ( Int, Node )) -> Frontier -> Set NodeKey -> Maybe Int
+astarHelp goal getNeighbours frontier expanded =
     case frontierHead goal frontier of
         Nothing ->
             Nothing
@@ -84,12 +104,6 @@ dijkstraHelp goal grid frontier expanded =
 
             else
                 let
-                    {- _ =
-                           Debug.log "next node" node
-
-                       _ =
-                           Debug.log "frontier size" (Dict.size frontier)
-                    -}
                     newExpanded =
                         Set.insert (key node) expanded
 
@@ -103,9 +117,9 @@ dijkstraHelp goal grid frontier expanded =
                                     frontierLowerUpdate (dist + edgeWeight) neighbour frontier_
                             )
                             (frontierRemove node frontier)
-                            (dijkstraNeighbours node grid)
+                            (getNeighbours node)
                 in
-                dijkstraHelp goal grid newFrontier newExpanded
+                astarHelp goal getNeighbours newFrontier newExpanded
 
 
 type alias NodeKey =
@@ -174,8 +188,8 @@ frontierRemove node =
     Dict.remove (key node)
 
 
-dijkstraNeighbours : Node -> RaGrid -> List ( Int, Node )
-dijkstraNeighbours node grid =
+crucibleMoves : RaGrid -> Node -> List ( Int, Node )
+crucibleMoves grid node =
     List.filterMap
         (\nextDir ->
             if nextDir == oppositeDir node.lastDir then
@@ -187,53 +201,68 @@ dijkstraNeighbours node grid =
                 -- Forbidden
 
             else
-                let
-                    ( x, y ) =
-                        node.position
-
-                    nextPos =
-                        case nextDir of
-                            Up ->
-                                ( x, y - 1 )
-
-                            Down ->
-                                ( x, y + 1 )
-
-                            Left ->
-                                ( x - 1, y )
-
-                            Right ->
-                                ( x + 1, y )
-
-                    nextBlock =
-                        Dict.get nextPos grid
-
-                    sameDirCount =
-                        if nextDir == node.lastDir then
-                            node.lastDirCount
-
-                        else
-                            0
-                in
-                nextBlock
-                    |> Maybe.map
-                        (\nextWeight ->
-                            ( nextWeight, { position = nextPos, lastDir = nextDir, lastDirCount = 1 + sameDirCount } )
-                        )
+                move1 grid node nextDir
         )
         [ Up, Down, Left, Right ]
 
 
-weightAt : Position -> Grid -> Maybe Int
-weightAt ( x, y ) grid =
-    if x < 0 || y < 0 then
-        Nothing
+move1 : RaGrid -> Node -> Direction -> Maybe ( Int, Node )
+move1 grid node nextDir =
+    let
+        ( x, y ) =
+            node.position
 
-    else
-        grid
-            |> List.drop y
-            |> List.head
-            |> Maybe.andThen (List.drop x >> List.head)
+        nextPos =
+            case nextDir of
+                Up ->
+                    ( x, y - 1 )
+
+                Down ->
+                    ( x, y + 1 )
+
+                Left ->
+                    ( x - 1, y )
+
+                Right ->
+                    ( x + 1, y )
+
+        nextBlock =
+            Dict.get nextPos grid
+
+        sameDirCount =
+            if nextDir == node.lastDir then
+                node.lastDirCount
+
+            else
+                0
+    in
+    nextBlock
+        |> Maybe.map
+            (\nextWeight ->
+                ( nextWeight, { position = nextPos, lastDir = nextDir, lastDirCount = 1 + sameDirCount } )
+            )
+
+
+ultraCrucibleMoves : RaGrid -> Node -> List ( Int, Node )
+ultraCrucibleMoves grid node =
+    List.filterMap
+        (\nextDir ->
+            if nextDir == oppositeDir node.lastDir then
+                Nothing
+
+            else if nextDir == node.lastDir && node.lastDirCount == 10 then
+                Nothing
+
+            else if nextDir == node.lastDir && node.lastDirCount /= 0 then
+                move1 grid node nextDir
+
+            else
+                move1 grid node nextDir
+                    |> Maybe.andThen (\( w1, n1 ) -> move1 grid n1 nextDir |> Maybe.map (\( w2, n2 ) -> ( w1 + w2, n2 )))
+                    |> Maybe.andThen (\( s2, n2 ) -> move1 grid n2 nextDir |> Maybe.map (\( w3, n3 ) -> ( s2 + w3, n3 )))
+                    |> Maybe.andThen (\( s3, n3 ) -> move1 grid n3 nextDir |> Maybe.map (\( w4, n4 ) -> ( s3 + w4, n4 )))
+        )
+        [ Up, Down, Left, Right ]
 
 
 oppositeDir : Direction -> Direction
