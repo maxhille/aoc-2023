@@ -43,16 +43,131 @@ type alias Error =
 
 
 calculatePart1 : Contraption -> Result Error Int
-calculatePart1 =
-    energize >> Set.size >> Ok
+calculatePart1 contraption =
+    energize contraption [ { position = ( 0, 0 ), direction = Right } ] |> Ok
 
 
-energize : Contraption -> Set Position
-energize =
-    energizeHelp Dict.empty [ { position = ( 0, 0 ), direction = Right } ]
-        >> Dict.keys
-        >> List.map Tuple.first
-        >> Set.fromList
+calculatePart2 : Contraption -> Result Error Int
+calculatePart2 contraption =
+    let
+        width =
+            contraption |> List.head |> Maybe.map List.length |> Maybe.withDefault 0
+
+        height =
+            contraption |> List.length
+    in
+    List.concat
+        [ List.range 0 (width - 1) |> List.map (\x -> { position = ( x, 0 ), direction = Down })
+        , List.range 0 (width - 1) |> List.map (\x -> { position = ( x, height - 1 ), direction = Up })
+        , List.range 0 (height - 1) |> List.map (\y -> { position = ( 0, y ), direction = Right })
+        , List.range 0 (height - 1) |> List.map (\y -> { position = ( width - 1, y ), direction = Left })
+        ]
+        |> energize contraption
+        |> Ok
+
+
+energize : Contraption -> List Beam -> Int
+energize contraption =
+    let
+        precomputed =
+            precomputeSplitters contraption
+    in
+    List.map
+        (energizeHelp precomputed Set.empty contraption)
+        >> List.map Set.size
+        >> List.maximum
+        >> Maybe.withDefault 0
+
+
+energizeHelp : Dict Key (Set Position) -> Set Position -> Contraption -> Beam -> Set Position
+energizeHelp dict positions contraption beam =
+    case advance contraption beam of
+        -- beam hit splitter
+        _ :: _ :: _ ->
+            case Dict.get (key beam) dict of
+                Just precomputed ->
+                    Set.union precomputed positions
+
+                Nothing ->
+                    Set.empty
+
+        -- beam exited contraption
+        [] ->
+            positions
+
+        [ updatedBeam ] ->
+            energizeHelp dict (Set.insert beam.position positions) contraption updatedBeam
+
+
+precomputeSplitters : Contraption -> Dict Key (Set Position)
+precomputeSplitters contraption =
+    splitterBeams contraption
+        |> List.foldl
+            (\{ beam1, beam2 } dict ->
+                let
+                    energized =
+                        precomputeSplittersHelp Dict.empty [ beam1, beam2 ] contraption
+                            |> Dict.keys
+                            |> List.map Tuple.first
+                            |> Set.fromList
+                in
+                dict
+                    |> Dict.insert (key beam1) energized
+                    |> Dict.insert (key beam2) energized
+            )
+            Dict.empty
+
+
+precomputeSplittersHelp : Dict Key () -> List Beam -> Contraption -> Dict Key ()
+precomputeSplittersHelp dict beams contraption =
+    if beams == [] then
+        dict
+
+    else
+        let
+            updatedDict =
+                beams
+                    |> List.map (\beam -> ( key beam, () ))
+                    |> Dict.fromList
+                    |> Dict.union dict
+
+            updatedBeams =
+                beams
+                    |> List.map (advance contraption)
+                    |> List.concat
+                    |> List.filter (\beam -> not <| Dict.member (key beam) dict)
+        in
+        precomputeSplittersHelp updatedDict updatedBeams contraption
+
+
+splitterBeams : Contraption -> List { beam1 : Beam, beam2 : Beam }
+splitterBeams =
+    indexedMap
+        (\position field ->
+            case field of
+                Horizontal ->
+                    Just
+                        { beam1 = { position = position, direction = Up }
+                        , beam2 = { position = position, direction = Down }
+                        }
+
+                Vertical ->
+                    Just
+                        { beam1 = { position = position, direction = Left }
+                        , beam2 = { position = position, direction = Right }
+                        }
+
+                _ ->
+                    Nothing
+        )
+        >> List.filterMap identity
+
+
+indexedMap : (Position -> Field -> a) -> Contraption -> List a
+indexedMap fn =
+    List.indexedMap Tuple.pair
+        >> List.map (\( y, row ) -> row |> List.indexedMap Tuple.pair |> List.map (\( x, field ) -> fn ( x, y ) field))
+        >> List.concat
 
 
 type alias Key =
@@ -75,28 +190,6 @@ key beam =
         Right ->
             3
     )
-
-
-energizeHelp : Dict Key () -> List Beam -> Contraption -> Dict Key ()
-energizeHelp dict beams contraption =
-    if beams == [] then
-        dict
-
-    else
-        let
-            updatedDict =
-                beams
-                    |> List.map (\beam -> ( key beam, () ))
-                    |> Dict.fromList
-                    |> Dict.union dict
-
-            updatedBeams =
-                beams
-                    |> List.map (advance contraption)
-                    |> List.concat
-                    |> List.filter (\beam -> not <| Dict.member (key beam) dict)
-        in
-        energizeHelp updatedDict updatedBeams contraption
 
 
 advance : Contraption -> Beam -> List Beam
@@ -195,11 +288,6 @@ fieldAt beam contraption =
             |> List.drop y
             |> List.head
             |> Maybe.andThen (List.drop x >> List.head)
-
-
-calculatePart2 : Contraption -> Result Error Int
-calculatePart2 _ =
-    Err "not implemented"
 
 
 parser : Parser Contraption

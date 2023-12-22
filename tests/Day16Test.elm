@@ -35,6 +35,31 @@ suite =
                         |> Result.mapError Parser.deadEndsToString
                         |> Result.andThen calculatePart1
                     )
+        , test "Part 2 - Example" <|
+            \_ ->
+                let
+                    input =
+                        String.replace "X" "\\" <|
+                            sanitize <|
+                                """
+                                .|...X....
+                                |.-.X.....
+                                .....|-...
+                                ........|.
+                                ..........
+                                .........X
+                                ..../.XX..
+                                .-.-/..|..
+                                .|....-|.X
+                                ..//.|....
+                                """
+                in
+                Expect.equal
+                    (Ok 51)
+                    (Parser.run parser input
+                        |> Result.mapError Parser.deadEndsToString
+                        |> Result.andThen calculatePart2
+                    )
         , test "parser" <|
             \_ ->
                 let
