@@ -1,27 +1,24 @@
-module Day18 exposing (Color(..), Direction(..), calculatePart1, calculatePart2, parser, puzzle)
+module Day18 exposing (Direction(..), calculatePart1, calculatePart2, parser, puzzle)
 
-import Parser exposing ((|.), (|=), Parser, Trailing(..), int, oneOf, spaces, succeed, symbol)
+import Parser exposing ((|.), (|=), Parser, Trailing(..), int, oneOf, problem, spaces, succeed, symbol)
 import Puzzle exposing (Puzzle)
-import Set exposing (Set)
 
 
 type alias Plan =
-    List Instruction
-
-
-type alias Lagoon =
-    Set Position
+    List ColoredInstruction
 
 
 type alias Instruction =
     { direction : Direction
     , distance : Int
-    , color : Color
     }
 
 
-type Color
-    = Color Int Int Int
+type alias ColoredInstruction =
+    { direction : Direction
+    , distance : Int
+    , colorInstruction : Instruction
+    }
 
 
 type Direction
@@ -41,91 +38,88 @@ type alias Error =
 
 calculatePart1 : Plan -> Result Error Int
 calculatePart1 =
-    dig >> Set.size >> Ok
+    List.map (\coloredInstruction -> { distance = coloredInstruction.distance, direction = coloredInstruction.direction })
+        >> dig
+        >> Ok
 
 
 calculatePart2 : Plan -> Result Error Int
-calculatePart2 _ =
-    Err "not implemented"
+calculatePart2 =
+    List.map .colorInstruction
+        >> dig
+        >> Ok
 
 
-dig : Plan -> Lagoon
+dig : List Instruction -> Int
 dig =
-    trench >> interior
+    trench >> area
 
 
-trench : Plan -> Set Position
+trench : List Instruction -> List Position
 trench =
-    trenchHelp [ ( 0, 0 ) ] >> Set.fromList
+    trenchHelp [ ( 0, 0 ) ]
 
 
-trenchHelp : List Position -> Plan -> List Position
+trenchHelp : List Position -> List Instruction -> List Position
 trenchHelp revPositions plan =
     case ( revPositions, plan ) of
         ( lastPos :: _, instruction :: remainder ) ->
-            trenchHelp (List.append (move lastPos instruction) revPositions) remainder
+            trenchHelp (move lastPos instruction :: revPositions) remainder
 
         ( _, _ ) ->
-            revPositions
+            List.reverse revPositions
 
 
-move : Position -> Instruction -> List Position
+move : Position -> Instruction -> Position
 move ( x, y ) { direction, distance } =
-    let
-        range =
-            List.range 1 distance |> List.reverse
-    in
     case direction of
         Up ->
-            List.map (\dy -> ( x, y - dy )) range
+            ( x, y - distance )
 
         Down ->
-            List.map (\dy -> ( x, y + dy )) range
+            ( x, y + distance )
 
         Left ->
-            List.map (\dx -> ( x - dx, y )) range
+            ( x - distance, y )
 
         Right ->
-            List.map (\dx -> ( x + dx, y )) range
+            ( x + distance, y )
 
 
-interior : Set Position -> Set Position
-interior bounds =
-    case firstInside bounds of
-        Just position ->
-            interiorHelp [ position ] bounds
-
-        Nothing ->
-            bounds
-
-
-interiorHelp : List Position -> Set Position -> Set Position
-interiorHelp queue positions =
-    case queue of
-        [] ->
-            positions
-
+area : List Position -> Int
+area positions =
+    let
+        len =
+            length positions
+    in
+    case positions of
         head :: tail ->
-            if Set.member head positions then
-                interiorHelp tail positions
+            let
+                shifted =
+                    List.append tail [ head ]
+            in
+            List.map2 (\pos1 pos2 -> ( pos1, pos2 )) positions shifted
+                |> List.foldl (\( ( x1, y1 ), ( x2, y2 ) ) sum -> sum + (x1 * y2 - x2 * y1)) 0
+                |> (\sum -> round <| toFloat sum * 0.5)
+                |> (\sum -> abs sum + len // 2 + 1)
 
-            else
-                let
-                    neighbours ( x, y ) =
-                        [ ( x - 1, y ), ( x, y + 1 ), ( x + 1, y ), ( x, y - 1 ) ]
-                in
-                interiorHelp (List.append tail (neighbours head)) (Set.insert head positions)
+        _ ->
+            0
 
 
-firstInside : Set Position -> Maybe Position
-firstInside =
-    -- there are some degenerate maps where this is not general enough
-    Set.partition (\( _, y ) -> y == 1)
-        >> Tuple.first
-        >> Set.toList
-        >> List.sortBy Tuple.first
-        >> List.head
-        >> Maybe.map (\( x, y ) -> ( x + 1, y ))
+length : List Position -> Int
+length positions =
+    case positions of
+        head :: tail ->
+            let
+                shifted =
+                    List.append tail [ head ]
+            in
+            List.map2 (\pos1 pos2 -> ( pos1, pos2 )) positions shifted
+                |> List.foldl (\( ( x1, y1 ), ( x2, y2 ) ) sum -> sum + abs (x1 - x2 + y1 - y2)) 0
+
+        _ ->
+            0
 
 
 parser : Parser Plan
@@ -136,32 +130,48 @@ parser =
         , end = ""
         , spaces = spaces
         , item =
-            succeed Instruction
+            succeed ColoredInstruction
                 |= directionParser
                 |. spaces
                 |= int
                 |. spaces
-                |= colorParser
+                |= colorInstructionParser
         , trailing = Optional
         }
 
 
-colorParser : Parser Color
-colorParser =
-    succeed Color
+colorInstructionParser : Parser Instruction
+colorInstructionParser =
+    succeed (\a b c d e f -> ( a * 16 ^ 4 + b * 16 ^ 3 + c * 16 ^ 2 + d * 16 + e, f ))
         |. symbol "("
         |. symbol "#"
-        |= byteParser
-        |= byteParser
-        |= byteParser
+        |= halfByteParser
+        |= halfByteParser
+        |= halfByteParser
+        |= halfByteParser
+        |= halfByteParser
+        |= halfByteParser
         |. symbol ")"
+        |> Parser.andThen toInstruction
 
 
-byteParser : Parser Int
-byteParser =
-    succeed (\a b -> a * 16 + b)
-        |= halfByteParser
-        |= halfByteParser
+toInstruction : ( Int, Int ) -> Parser Instruction
+toInstruction ( distance, encodedDirection ) =
+    case encodedDirection of
+        0 ->
+            succeed { distance = distance, direction = Right }
+
+        1 ->
+            succeed { distance = distance, direction = Down }
+
+        2 ->
+            succeed { distance = distance, direction = Left }
+
+        3 ->
+            succeed { distance = distance, direction = Up }
+
+        _ ->
+            problem "unknown encoding for direction"
 
 
 halfByteParser : Parser Int
