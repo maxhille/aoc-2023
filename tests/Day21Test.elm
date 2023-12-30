@@ -1,5 +1,6 @@
 module Day21Test exposing (..)
 
+import Array
 import Day21 exposing (..)
 import Expect
 import Parser
@@ -46,10 +47,11 @@ suite =
                             """
                 in
                 Expect.equal
-                    (Ok
-                        [ [ Plot, Start ]
-                        , [ Plot, Rocks ]
-                        ]
+                    ([ [ Plot, Start ] |> Array.fromList
+                     , [ Plot, Rocks ] |> Array.fromList
+                     ]
+                        |> Array.fromList
+                        |> Ok
                     )
                     (Parser.run parser input)
         ]

@@ -1,12 +1,13 @@
 module Day21 exposing (Field(..), calculatePart1, calculatePart2, parser, puzzle)
 
+import Array exposing (Array)
 import Parser exposing ((|.), (|=), Parser, Trailing(..), oneOf, succeed, symbol)
 import Puzzle exposing (Puzzle)
 import Set exposing (Set)
 
 
 type alias Garden =
-    List (List Field)
+    Array (Array Field)
 
 
 type alias Position =
@@ -29,9 +30,33 @@ calculatePart1 steps garden =
             )
 
 
-calculatePart2 : Garden -> Result String Int
-calculatePart2 _ =
-    Err "not implemented"
+calculatePart2 : Int -> Garden -> Result String Int
+calculatePart2 steps garden =
+    let
+        height =
+            131
+
+        repeats =
+            steps // height
+
+        outerReachable =
+            (wander ( 0, 0 ) 65 garden |> Set.size)
+                + (wander ( height - 1, 0 ) 65 garden |> Set.size)
+                + (wander ( height - 1, height - 1 ) 65 garden |> Set.size)
+                + (wander ( 0, height - 1 ) 65 garden |> Set.size)
+
+        centerReachable =
+            wander ( 65, 65 ) (modBy height steps) garden
+                |> Set.size
+
+        repeatedCenterReachable =
+            ceiling (toFloat ((repeats * 2 + 1) ^ 2) * 0.5) * centerReachable
+
+        repeatedOuterReachable =
+            floor (toFloat ((repeats * 2 + 1) ^ 2) * 0.5) * outerReachable
+    in
+    Ok (repeatedCenterReachable + repeatedOuterReachable)
+        |> Result.andThen (\_ -> Err "my solution seems to miss something and does not produce the correct answer :-(. I moved on to the next puzzle")
 
 
 wander : Position -> Int -> Garden -> Set Position
@@ -71,35 +96,43 @@ walk ( x, y ) garden =
 
 
 startPosition : Garden -> Result String Position
-startPosition garden =
-    List.foldl
-        (\( y, row ) result ->
+startPosition =
+    positionedFold
+        (\position field result ->
             case result of
-                Nothing ->
-                    List.foldl
-                        (\( x, field ) result_ ->
-                            if field == Start then
-                                Just ( x, y )
-
-                            else
-                                result_
-                        )
-                        Nothing
-                        (List.indexedMap Tuple.pair
-                            row
-                        )
-
-                _ ->
+                Ok _ ->
                     result
+
+                Err _ ->
+                    if field == Start then
+                        Ok position
+
+                    else
+                        result
         )
-        Nothing
-        (List.indexedMap Tuple.pair garden)
-        |> Result.fromMaybe "no start position found"
+        (Err "no start position found")
+
+
+positionedFold : (Position -> Field -> a -> a) -> a -> Garden -> a
+positionedFold fn a garden =
+    Array.foldl
+        (\( y, row ) acc ->
+            Array.foldl
+                (\( x, field ) acc_ ->
+                    fn ( x, y ) field acc_
+                )
+                acc
+                (Array.indexedMap Tuple.pair
+                    row
+                )
+        )
+        a
+        (Array.indexedMap Tuple.pair garden)
 
 
 fieldAt : Position -> Garden -> Maybe Field
 fieldAt ( x, y ) =
-    List.drop y >> List.head >> Maybe.andThen (List.drop x >> List.head)
+    Array.get y >> Maybe.andThen (Array.get x)
 
 
 parser : Parser Garden
@@ -112,9 +145,10 @@ parser =
         , item = rowParser
         , trailing = Optional
         }
+        |> Parser.map Array.fromList
 
 
-rowParser : Parser (List Field)
+rowParser : Parser (Array Field)
 rowParser =
     Parser.sequence
         { start = ""
@@ -132,11 +166,12 @@ rowParser =
                 ]
         , trailing = Optional
         }
+        |> Parser.map Array.fromList
 
 
 puzzle : Puzzle
 puzzle =
     { validate = Parser.run parser >> Result.map (\_ -> "could not parse") >> Result.mapError Parser.deadEndsToString
     , calculatePart1 = Parser.run parser >> Result.mapError Parser.deadEndsToString >> Result.andThen (calculatePart1 64)
-    , calculatePart2 = Parser.run parser >> Result.mapError Parser.deadEndsToString >> Result.andThen calculatePart2
+    , calculatePart2 = Parser.run parser >> Result.mapError Parser.deadEndsToString >> Result.andThen (calculatePart2 26501365)
     }
