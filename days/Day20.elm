@@ -39,32 +39,90 @@ type alias Signal =
 
 
 type alias Count =
-    { low : Int, high : Int }
+    { low : Int, high : Int, pushes : Int }
 
 
 calculatePart1 : List ModuleDef -> Result String Int
 calculatePart1 =
     toNetwork
-        >> process 1000
+        >> process (\signals pushes -> pushes == 1000 && signals == [])
         >> (\{ low, high } -> low * high)
         >> Ok
 
 
-process : Int -> Network -> Count
-process pushes =
-    processHelp { low = 0, high = 0 } pushes []
+calculatePart2 : List ModuleDef -> Result String Int
+calculatePart2 modulesDefs =
+    let
+        network =
+            toNetwork modulesDefs
+
+        cycleTargets =
+            findRxSources network
+    in
+    cycleTargets
+        |> List.map (\id -> process (\signals _ -> signals |> List.filter (\signal -> signal.from == id && signal.pulse == High) |> List.isEmpty |> not) network)
+        |> List.map .pushes
+        -- technically we would need to calculate the LCM here, but I guess the cycle lengths were not just prime for me
+        |> List.product
+        |> Ok
 
 
-processHelp : Count -> Int -> List Signal -> Network -> Count
-processHelp count pushes signals network =
-    if pushes == 0 && signals == [] then
+{-| this assumes that rx is signalled by a Conjunction which in turn is also signalled by Conjunctions
+-}
+findRxSources : Network -> List Id
+findRxSources network =
+    network
+        |> Dict.foldl
+            (\id mod acc ->
+                case mod of
+                    Conjunction { outputs } ->
+                        if List.member "rx" outputs then
+                            id :: acc
+
+                        else
+                            acc
+
+                    _ ->
+                        acc
+            )
+            []
+        |> List.head
+        |> Maybe.map
+            (\toRxId ->
+                network
+                    |> Dict.foldl
+                        (\id mod acc ->
+                            case mod of
+                                Conjunction { outputs } ->
+                                    if List.member toRxId outputs then
+                                        id :: acc
+
+                                    else
+                                        acc
+
+                                _ ->
+                                    acc
+                        )
+                        []
+            )
+        |> Maybe.withDefault []
+
+
+process : (List Signal -> Int -> Bool) -> Network -> Count
+process stop =
+    processHelp stop { low = 0, high = 0, pushes = 0 } 0 []
+
+
+processHelp : (List Signal -> Int -> Bool) -> Count -> Int -> List Signal -> Network -> Count
+processHelp stop count pushes signals network =
+    if stop signals pushes then
         count
 
     else
         let
             ( newPushes, bumpedSignals ) =
                 if signals == [] then
-                    ( pushes - 1, [ { from = "button", to = "broadcaster", pulse = Low } ] )
+                    ( pushes + 1, [ { from = "button", to = "broadcaster", pulse = Low } ] )
 
                 else
                     ( pushes, signals )
@@ -80,7 +138,7 @@ processHelp count pushes signals network =
                                 Low ->
                                     { acc | low = acc.low + 1 }
                         )
-                        count
+                        { count | pushes = newPushes }
 
             updated =
                 List.foldl
@@ -94,7 +152,7 @@ processHelp count pushes signals network =
                     { network = network, signals = [] }
                     bumpedSignals
         in
-        processHelp newCount newPushes updated.signals updated.network
+        processHelp stop newCount newPushes updated.signals updated.network
 
 
 processSignal : Signal -> Network -> ( Network, List Signal )
@@ -139,11 +197,6 @@ processSignal signal network =
 
         Nothing ->
             ( network, [] )
-
-
-calculatePart2 : List ModuleDef -> Result String Int
-calculatePart2 _ =
-    Err "not implemented"
 
 
 toNetwork : List ModuleDef -> Network
